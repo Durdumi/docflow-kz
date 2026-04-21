@@ -114,9 +114,9 @@ export interface Report {
   file_size?: number;
   error_message?: string;
   created_by_id: string;
-  organization_id: string;
+  organization_id?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   completed_at?: string;
 }
 

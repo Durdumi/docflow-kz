@@ -11,6 +11,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
@@ -20,6 +21,7 @@ import {
   FileTextOutlined,
   PlusOutlined,
   ReloadOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -30,7 +32,10 @@ import type { Report, ReportCreate } from "@/types";
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
 
-const STATUS_CONFIG: Record<string, { color: "default" | "processing" | "success" | "error"; label: string }> = {
+const STATUS_CONFIG: Record<
+  string,
+  { color: "default" | "processing" | "success" | "error"; label: string }
+> = {
   pending:    { color: "default",    label: "Ожидает" },
   generating: { color: "processing", label: "Генерируется" },
   ready:      { color: "success",    label: "Готов" },
@@ -61,11 +66,20 @@ export const ReportsPage = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [form] = Form.useForm<FormValues>();
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["reports"],
     queryFn: () => reportsApi.list(),
+    // Автообновление пока есть pending/generating отчёты
+    refetchInterval: (query) => {
+      const items = query.state.data?.items ?? [];
+      const hasActive = items.some(
+        (r) => r.status === "pending" || r.status === "generating"
+      );
+      return hasActive ? 3000 : false;
+    },
   });
 
   const createMutation = useMutation({
@@ -87,6 +101,25 @@ export const ReportsPage = () => {
     },
     onError: () => message.error("Ошибка при удалении"),
   });
+
+  const handleDownload = async (record: Report) => {
+    setDownloadingId(record.id);
+    try {
+      const blob = await reportsApi.download(record.id);
+      const ext = record.format === "excel" ? "xlsx" : record.format;
+      const filename = `${record.title}.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error("Не удалось скачать файл");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const handleFinish = (values: FormValues) => {
     const [periodFrom, periodTo] = values.period ?? [];
@@ -117,7 +150,8 @@ export const ReportsPage = () => {
       dataIndex: "type",
       key: "type",
       width: 140,
-      render: (type: string) => TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type,
+      render: (type: string) =>
+        TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type,
     },
     {
       title: "Формат",
@@ -130,11 +164,28 @@ export const ReportsPage = () => {
       title: t("common.status"),
       dataIndex: "status",
       key: "status",
-      width: 140,
-      render: (status: string) => {
+      width: 160,
+      render: (status: string, record: Report) => {
         const cfg = STATUS_CONFIG[status] ?? { color: "default", label: status };
-        return <Badge status={cfg.color} text={cfg.label} />;
+        return (
+          <Space>
+            <Badge status={cfg.color} text={cfg.label} />
+            {status === "failed" && record.error_message && (
+              <Tooltip title={record.error_message}>
+                <WarningOutlined style={{ color: "#ff4d4f" }} />
+              </Tooltip>
+            )}
+          </Space>
+        );
       },
+    },
+    {
+      title: "Размер",
+      dataIndex: "file_size",
+      key: "file_size",
+      width: 100,
+      render: (size?: number) =>
+        size ? `${(size / 1024).toFixed(1)} KB` : "—",
     },
     {
       title: "Создан",
@@ -146,15 +197,15 @@ export const ReportsPage = () => {
     {
       title: t("common.actions"),
       key: "actions",
-      width: 140,
-      render: (_, record: Report) => (
+      width: 120,
+      render: (_: unknown, record: Report) => (
         <Space>
           {record.status === "ready" && record.file_url && (
             <Button
               size="small"
               icon={<DownloadOutlined />}
-              href={record.file_url}
-              target="_blank"
+              loading={downloadingId === record.id}
+              onClick={() => handleDownload(record)}
             >
               {t("reports.download")}
             </Button>
@@ -231,7 +282,10 @@ export const ReportsPage = () => {
             label="Название отчёта"
             rules={[{ required: true, message: "Введите название" }]}
           >
-            <Input placeholder="Например: Ежемесячный отчёт за апрель" maxLength={255} />
+            <Input
+              placeholder="Например: Ежемесячный отчёт за апрель"
+              maxLength={255}
+            />
           </Form.Item>
 
           <Form.Item

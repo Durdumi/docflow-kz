@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,6 +62,40 @@ async def get_report(
     if not report:
         raise HTTPException(status_code=404, detail="Отчёт не найден")
     return report
+
+
+@router.get("/{report_id}/download")
+async def download_report(
+    report_id: uuid.UUID,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    schema = await _get_schema(current_user, db)
+    await db.execute(text(f'SET LOCAL search_path TO "{schema}", public'))
+    report = await ReportService(db, schema).get_by_id(report_id, current_user.organization_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Отчёт не найден")
+    if report.status != "ready" or not report.file_url:
+        raise HTTPException(status_code=400, detail="Файл ещё не готов")
+
+    from app.services.storage_service import get_minio_client
+    from app.core.config import settings
+
+    client = get_minio_client()
+    response = client.get_object(settings.MINIO_BUCKET_REPORTS, report.file_url)
+
+    filename = report.file_url.split("/")[-1]
+    ext = filename.rsplit(".", 1)[-1].lower()
+    content_type = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        if ext == "xlsx" else "application/pdf"
+    )
+
+    return StreamingResponse(
+        response,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/{report_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # ─── MinIO ────────────────────────────────────────────────
     MINIO_ENDPOINT: str = "minio:9000"
+    MINIO_PUBLIC_URL: str = "http://localhost:9000"  # URL доступный из браузера
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin_secret"
     MINIO_BUCKET_DOCUMENTS: str = "documents"

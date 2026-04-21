@@ -17,6 +17,13 @@ export const reportsApi = {
     return response.data;
   },
 
+  download: async (id: string): Promise<Blob> => {
+    const response = await apiClient.get(`/reports/${id}/download`, {
+      responseType: "blob",
+    });
+    return response.data;
+  },
+
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/reports/${id}`);
   },

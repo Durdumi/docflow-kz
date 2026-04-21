@@ -1,7 +1,8 @@
 import io
 import uuid
+
 from minio import Minio
-from minio.error import S3Error
+
 from app.core.config import settings
 
 
@@ -15,9 +16,9 @@ def get_minio_client() -> Minio:
 
 
 def upload_file(bucket: str, file_bytes: bytes, filename: str, content_type: str) -> str:
+    """Загружает файл в MinIO. Возвращает object_name (ключ внутри бакета)."""
     client = get_minio_client()
-    file_id = str(uuid.uuid4())
-    object_name = f"{file_id}/{filename}"
+    object_name = f"{uuid.uuid4()}/{filename}"
     client.put_object(
         bucket,
         object_name,
@@ -25,11 +26,6 @@ def upload_file(bucket: str, file_bytes: bytes, filename: str, content_type: str
         length=len(file_bytes),
         content_type=content_type,
     )
-    return f"/storage/{bucket}/{object_name}"
+    return object_name
 
 
-def get_presigned_url(bucket: str, object_name: str, expires_hours: int = 24) -> str:
-    from datetime import timedelta
-    client = get_minio_client()
-    object_path = object_name.replace(f"/storage/{bucket}/", "")
-    return client.presigned_get_object(bucket, object_path, expires=timedelta(hours=expires_hours))
