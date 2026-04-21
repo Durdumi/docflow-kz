@@ -14,7 +14,13 @@
       "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"damir.gubaidulin@med-tech.kz\",\"password\":\"Admin1234!\"}')",
       "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"verify@verifyorg.kz\",\"password\":\"TestPass123!\"}')",
       "Bash(curl -s \"http://localhost:9000/reports/626ceba6-e334-47d7-8baa-56145754d60f/April%20Monthly_e186e5ac-56ac-4613-93ed-3b6651f51ced.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=minioadmin%2F20260421%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260421T105324Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=fb34a31ba59e94a3bc39bd7a646cea30357d4c4657dbc2054fa2b4abb630cbfb\")",
-      "Bash(git restore *)"
+      "Bash(git restore *)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@docflow.kz\",\"password\":\"admin123\"}')",
+      "Bash(docker exec *)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"verify@verifyorg.kz\",\"password\":\"__TRACKED_VAR__\"}')",
+      "Bash(xargs grep *)",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"verify@verifyorg.kz\",\"password\":\"test123456\"}')",
+      "Read(//tmp/**)"
     ]
   }
 }

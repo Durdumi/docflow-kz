@@ -81,12 +81,21 @@ async def download_report(
     from app.services.storage_service import get_minio_client
     from app.core.config import settings
 
+    # Поддержка двух форматов file_url:
+    #   старый: /storage/reports/uuid/filename.pdf
+    #   новый:  uuid/filename.pdf
+    _prefix = "/storage/reports/"
+    if report.file_url.startswith(_prefix):
+        object_name = report.file_url[len(_prefix):]
+    else:
+        object_name = report.file_url
+
     client = get_minio_client()
-    response = client.get_object(settings.MINIO_BUCKET_REPORTS, report.file_url)
+    response = client.get_object(settings.MINIO_BUCKET_REPORTS, object_name)
 
     import urllib.parse
 
-    filename = report.file_url.split("/")[-1]
+    filename = object_name.split("/")[-1]
     ext = filename.rsplit(".", 1)[-1].lower()
     content_type = (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
