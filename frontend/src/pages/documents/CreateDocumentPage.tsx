@@ -1,255 +1,197 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import {
   Button,
   Card,
-  Checkbox,
-  DatePicker,
+  Col,
   Form,
   Input,
-  InputNumber,
+  Row,
   Select,
   Space,
-  Spin,
   Typography,
   message,
 } from "antd";
 import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DocumentTemplate, TemplateField } from "@/types";
-import { type CreateDocumentRequest, documentsApi, templatesApi } from "@/api/documents";
+import { documentsApi, templatesApi } from "@/api/documents";
+import type { TemplateField, TemplateShort } from "@/api/documents";
 
-const { Title, Text } = Typography;
-const { Option } = Select;
-
-const DynamicField = ({
-  field,
-  onChange,
-  value,
-}: {
-  field: TemplateField;
-  value: unknown;
-  onChange: (v: unknown) => void;
-}) => {
-  switch (field.type) {
-    case "number":
-      return (
-        <InputNumber
-          style={{ width: "100%" }}
-          value={value as number}
-          onChange={onChange}
-          placeholder={field.label}
-        />
-      );
-    case "date":
-      return (
-        <DatePicker
-          style={{ width: "100%" }}
-          format="DD.MM.YYYY"
-          onChange={(_, str) => onChange(str)}
-        />
-      );
-    case "select":
-      return (
-        <Select
-          style={{ width: "100%" }}
-          value={value as string}
-          onChange={onChange}
-          placeholder={`Выберите ${field.label.toLowerCase()}`}
-        >
-          {(field.options ?? []).map((opt) => (
-            <Option key={opt} value={opt}>
-              {opt}
-            </Option>
-          ))}
-        </Select>
-      );
-    case "textarea":
-      return (
-        <Input.TextArea
-          rows={3}
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.label}
-        />
-      );
-    case "checkbox":
-      return (
-        <Checkbox
-          checked={!!value}
-          onChange={(e) => onChange(e.target.checked)}
-        >
-          {field.label}
-        </Checkbox>
-      );
-    default:
-      return (
-        <Input
-          value={value as string}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={field.label}
-        />
-      );
-  }
-};
+const { Title } = Typography;
+const { TextArea } = Input;
 
 export const CreateDocumentPage = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const [form] = Form.useForm();
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateShort | null>(null);
 
-  const { data: templates, isLoading: loadingTemplates } = useQuery({
+  const { data: templates = [] } = useQuery({
     queryKey: ["templates-short"],
-    queryFn: () => templatesApi.listShort(),
+    queryFn: templatesApi.listShort,
   });
-
-  const selectedTemplate = templates?.find((t) => t.id === selectedTemplateId) as
-    | DocumentTemplate
-    | undefined;
-
-  const fields = (selectedTemplate?.fields ?? []) as TemplateField[];
-
-  // Сброс значений полей при смене шаблона
-  useEffect(() => {
-    const defaults: Record<string, unknown> = {};
-    fields.forEach((f) => {
-      defaults[f.name] = f.default_value ?? (f.type === "checkbox" ? false : "");
-    });
-    setFieldValues(defaults);
-  }, [selectedTemplateId]);
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateDocumentRequest) => documentsApi.create(data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["documents"] });
+    mutationFn: documentsApi.create,
+    onSuccess: (doc: { id: string }) => {
       message.success("Документ создан");
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
       navigate("/documents");
     },
-    onError: () => message.error("Ошибка при создании документа"),
+    onError: (err: { response?: { data?: { detail?: string } } }) => {
+      message.error(err?.response?.data?.detail ?? "Ошибка при создании");
+    },
   });
 
-  const handleSubmit = async () => {
-    const values = await form.validateFields();
+  const onTemplateSelect = (templateId: string) => {
+    const tmpl = templates.find((t) => t.id === templateId) ?? null;
+    setSelectedTemplate(tmpl);
+    form.setFieldValue("template_id", templateId);
+  };
 
-    // Проверяем обязательные поля шаблона
-    const missingRequired = fields.filter(
-      (f) => f.required && !fieldValues[f.name] && fieldValues[f.name] !== false
-    );
-    if (missingRequired.length > 0) {
-      message.error(
-        `Заполните обязательные поля: ${missingRequired.map((f) => f.label).join(", ")}`
-      );
-      return;
+  const onTemplateClear = () => {
+    setSelectedTemplate(null);
+    form.setFieldValue("template_id", undefined);
+  };
+
+  const onFinish = (values: Record<string, unknown>) => {
+    const fieldData: Record<string, unknown> = {};
+    if (selectedTemplate?.fields) {
+      selectedTemplate.fields.forEach((field) => {
+        fieldData[field.name] = values[`field_${field.name}`] ?? "";
+      });
+    } else if (values.content) {
+      fieldData.content = values.content;
     }
 
     createMutation.mutate({
-      title: values.title,
-      template_id: selectedTemplateId ?? undefined,
-      data: fieldValues,
-      status: values.status ?? "draft",
+      title: values.title as string,
+      template_id: (values.template_id as string) || null,
+      data: fieldData,
+      status: "draft",
     });
   };
 
   return (
-    <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate("/documents")}
-        />
+    <div>
+      <div
+        style={{
+          marginBottom: 24,
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+        }}
+      >
+        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/documents")}>
+          Назад
+        </Button>
         <Title level={3} style={{ margin: 0 }}>
-          {t("documents.create")}
+          Новый документ
         </Title>
       </div>
 
-      <Card>
-        <Form form={form} layout="vertical">
-          {/* Название документа */}
-          <Form.Item
-            name="title"
-            label="Название документа"
-            rules={[{ required: true, message: "Введите название документа" }]}
-          >
-            <Input placeholder="Договор №123 с ТОО «Рога и Копыта»" maxLength={500} />
-          </Form.Item>
-
-          {/* Выбор шаблона */}
-          <Form.Item name="template_id" label="Шаблон (необязательно)">
-            {loadingTemplates ? (
-              <Spin size="small" />
-            ) : (
-              <Select
-                placeholder="Выберите шаблон..."
-                allowClear
-                showSearch
-                optionFilterProp="children"
-                onChange={(v) => setSelectedTemplateId(v ?? null)}
-              >
-                {(templates ?? []).map((tpl) => (
-                  <Option key={tpl.id} value={tpl.id}>
-                    {tpl.name}
-                  </Option>
-                ))}
-              </Select>
-            )}
-          </Form.Item>
-
-          {/* Статус */}
-          <Form.Item name="status" label="Начальный статус" initialValue="draft">
-            <Select style={{ width: 200 }}>
-              <Option value="draft">Черновик</Option>
-              <Option value="active">Активный</Option>
-            </Select>
-          </Form.Item>
-
-          {/* Динамические поля шаблона */}
-          {fields.length > 0 && (
+      <Form form={form} layout="vertical" onFinish={onFinish}>
+        <Row gutter={[24, 0]}>
+          <Col xs={24} lg={16}>
             <Card
-              title="Данные документа"
-              size="small"
-              style={{ marginTop: 8, marginBottom: 16 }}
+              bordered={false}
+              style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)", marginBottom: 16 }}
             >
-              {fields.map((field) => (
+              <Form.Item
+                name="title"
+                label="Название документа"
+                rules={[{ required: true, message: "Введите название" }]}
+              >
+                <Input
+                  placeholder="Например: Договор №123 от 01.04.2026"
+                  size="large"
+                />
+              </Form.Item>
+
+              <Form.Item name="template_id" label="Шаблон (необязательно)">
+                <Select
+                  placeholder="Выбрать шаблон"
+                  allowClear
+                  onChange={onTemplateSelect}
+                  onClear={onTemplateClear}
+                  options={templates.map((t) => ({ value: t.id, label: t.name }))}
+                />
+              </Form.Item>
+
+              {selectedTemplate?.fields?.map((field: TemplateField) => (
                 <Form.Item
-                  key={field.id}
-                  label={
-                    <Space>
-                      <Text>{field.label}</Text>
-                      {field.required && <Text type="danger">*</Text>}
-                    </Space>
-                  }
-                  style={{ marginBottom: 16 }}
+                  key={field.name}
+                  name={`field_${field.name}`}
+                  label={field.label}
+                  rules={[
+                    {
+                      required: field.required,
+                      message: `Заполните поле "${field.label}"`,
+                    },
+                  ]}
                 >
-                  <DynamicField
-                    field={field}
-                    value={fieldValues[field.name]}
-                    onChange={(v) =>
-                      setFieldValues((prev) => ({ ...prev, [field.name]: v }))
-                    }
-                  />
+                  {field.type === "textarea" ? (
+                    <TextArea rows={3} placeholder={field.label} />
+                  ) : field.type === "select" ? (
+                    <Select
+                      placeholder={field.label}
+                      options={(field.options ?? []).map((o) => ({
+                        value: o,
+                        label: o,
+                      }))}
+                    />
+                  ) : (
+                    <Input
+                      type={
+                        field.type === "number"
+                          ? "number"
+                          : field.type === "date"
+                          ? "date"
+                          : "text"
+                      }
+                      placeholder={field.label}
+                    />
+                  )}
                 </Form.Item>
               ))}
-            </Card>
-          )}
-        </Form>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-          <Button onClick={() => navigate("/documents")}>{t("common.cancel")}</Button>
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            loading={createMutation.isPending}
-            onClick={handleSubmit}
-          >
-            Создать документ
-          </Button>
-        </div>
-      </Card>
+              {!selectedTemplate && (
+                <Form.Item name="content" label="Содержание (свободный текст)">
+                  <TextArea rows={6} placeholder="Введите текст документа..." />
+                </Form.Item>
+              )}
+            </Card>
+          </Col>
+
+          <Col xs={24} lg={8}>
+            <Card bordered={false} style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+              <Title level={5}>Действия</Title>
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  htmlType="submit"
+                  loading={createMutation.isPending}
+                  block
+                >
+                  Сохранить как черновик
+                </Button>
+                <Button block onClick={() => navigate("/documents")}>
+                  Отмена
+                </Button>
+              </Space>
+
+              {selectedTemplate && (
+                <div style={{ marginTop: 16, fontSize: 12, color: "#8c8c8c" }}>
+                  Шаблон: <strong>{selectedTemplate.name}</strong>
+                  <br />
+                  Полей: {selectedTemplate.fields?.length ?? 0}
+                </div>
+              )}
+            </Card>
+          </Col>
+        </Row>
+      </Form>
     </div>
   );
 };

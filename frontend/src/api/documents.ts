@@ -1,116 +1,109 @@
 import { apiClient } from "./client";
-import type {
-  Document,
-  DocumentTemplate,
-  PaginatedResponse,
-  TemplateField,
-} from "@/types";
 
-// ─── Template Requests ────────────────────────────────────────────────────────
-export interface CreateTemplateRequest {
+export const documentsApi = {
+  list: async (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    search?: string;
+  }) => {
+    const response = await apiClient.get("/documents", { params });
+    return response.data;
+  },
+
+  getById: async (id: string) => {
+    const response = await apiClient.get(`/documents/${id}`);
+    return response.data;
+  },
+
+  create: async (data: {
+    title: string;
+    template_id?: string | null;
+    data?: Record<string, unknown>;
+    status?: string;
+  }) => {
+    const response = await apiClient.post("/documents", data);
+    return response.data;
+  },
+
+  update: async (
+    id: string,
+    data: { title?: string; data?: Record<string, unknown> }
+  ) => {
+    // Backend uses PUT for full document update
+    const response = await apiClient.put(`/documents/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string) => {
+    await apiClient.delete(`/documents/${id}`);
+  },
+
+  changeStatus: async (id: string, status: string) => {
+    const response = await apiClient.patch(`/documents/${id}/status`, { status });
+    return response.data;
+  },
+};
+
+export interface TemplateField {
+  id: string;
   name: string;
-  description?: string;
+  label: string;
+  type: "text" | "number" | "date" | "select" | "textarea" | "checkbox";
+  required: boolean;
+  options?: string[];
+  default_value?: string;
+}
+
+export interface TemplateShort {
+  id: string;
+  name: string;
   category: string;
   fields: TemplateField[];
 }
 
-export interface UpdateTemplateRequest {
-  name?: string;
-  description?: string;
-  category?: string;
-  fields?: TemplateField[];
-  is_active?: boolean;
-}
-
-export interface ListTemplatesParams {
-  page?: number;
-  page_size?: number;
-  category?: string;
-  search?: string;
-  active_only?: boolean;
-}
-
-// ─── Document Requests ────────────────────────────────────────────────────────
-export interface CreateDocumentRequest {
-  title: string;
-  template_id?: string;
-  data?: Record<string, unknown>;
-  status?: string;
-}
-
-export interface UpdateDocumentRequest {
-  title?: string;
-  data?: Record<string, unknown>;
-}
-
-export interface ListDocumentsParams {
-  page?: number;
-  page_size?: number;
-  status?: string;
-  template_id?: string;
-  search?: string;
-  my_only?: boolean;
-}
-
-// ─── API ─────────────────────────────────────────────────────────────────────
 export const templatesApi = {
-  list: async (params?: ListTemplatesParams): Promise<PaginatedResponse<DocumentTemplate>> => {
-    const res = await apiClient.get<PaginatedResponse<DocumentTemplate>>("/templates", { params });
-    return res.data;
+  list: async (params?: { page?: number; page_size?: number; search?: string }) => {
+    const response = await apiClient.get("/templates", { params });
+    return response.data;
   },
 
-  listShort: async (): Promise<DocumentTemplate[]> => {
-    const res = await apiClient.get<DocumentTemplate[]>("/templates/all-short");
-    return res.data;
+  listShort: async (): Promise<TemplateShort[]> => {
+    const response = await apiClient.get("/templates/all-short");
+    return response.data;
   },
 
-  get: async (id: string): Promise<DocumentTemplate> => {
-    const res = await apiClient.get<DocumentTemplate>(`/templates/${id}`);
-    return res.data;
+  getById: async (id: string) => {
+    const response = await apiClient.get(`/templates/${id}`);
+    return response.data;
   },
 
-  create: async (data: CreateTemplateRequest): Promise<DocumentTemplate> => {
-    const res = await apiClient.post<DocumentTemplate>("/templates", data);
-    return res.data;
+  create: async (data: {
+    name: string;
+    description?: string;
+    category: string;
+    fields: TemplateField[];
+  }) => {
+    const response = await apiClient.post("/templates", data);
+    return response.data;
   },
 
-  update: async (id: string, data: UpdateTemplateRequest): Promise<DocumentTemplate> => {
-    const res = await apiClient.put<DocumentTemplate>(`/templates/${id}`, data);
-    return res.data;
+  update: async (
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      category?: string;
+      fields?: TemplateField[];
+      is_active?: boolean;
+    }
+  ) => {
+    // Backend uses PUT for template update
+    const response = await apiClient.put(`/templates/${id}`, data);
+    return response.data;
   },
 
-  delete: async (id: string): Promise<void> => {
+  delete: async (id: string) => {
     await apiClient.delete(`/templates/${id}`);
-  },
-};
-
-export const documentsApi = {
-  list: async (params?: ListDocumentsParams): Promise<PaginatedResponse<Document>> => {
-    const res = await apiClient.get<PaginatedResponse<Document>>("/documents", { params });
-    return res.data;
-  },
-
-  get: async (id: string): Promise<Document> => {
-    const res = await apiClient.get<Document>(`/documents/${id}`);
-    return res.data;
-  },
-
-  create: async (data: CreateDocumentRequest): Promise<Document> => {
-    const res = await apiClient.post<Document>("/documents", data);
-    return res.data;
-  },
-
-  update: async (id: string, data: UpdateDocumentRequest): Promise<Document> => {
-    const res = await apiClient.put<Document>(`/documents/${id}`, data);
-    return res.data;
-  },
-
-  updateStatus: async (id: string, status: string): Promise<Document> => {
-    const res = await apiClient.patch<Document>(`/documents/${id}/status`, { status });
-    return res.data;
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/documents/${id}`);
   },
 };

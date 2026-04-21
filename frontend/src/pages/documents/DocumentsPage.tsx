@@ -1,43 +1,57 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import {
   Button,
+  Card,
   Input,
   Popconfirm,
   Select,
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
 import {
   DeleteOutlined,
-  EyeOutlined,
+  EditOutlined,
+  FileOutlined,
   PlusOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ColumnsType } from "antd/es/table";
-import type { Document, DocumentStatus } from "@/types";
 import { documentsApi } from "@/api/documents";
 
-const { Title, Text } = Typography;
-const { Option } = Select;
+const { Title } = Typography;
+const { Search } = Input;
 
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-  draft: { color: "default", label: "Черновик" },
-  active: { color: "green", label: "Активный" },
-  archived: { color: "blue", label: "Архив" },
-  deleted: { color: "red", label: "Удалён" },
+const STATUS_OPTIONS = [
+  { value: "",         label: "Все статусы" },
+  { value: "draft",    label: "Черновик" },
+  { value: "active",   label: "Активный" },
+  { value: "archived", label: "Архив" },
+];
+
+const STATUS_COLOR: Record<string, string> = {
+  draft:    "orange",
+  active:   "green",
+  archived: "default",
+  deleted:  "red",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  draft:    "Черновик",
+  active:   "Активный",
+  archived: "Архив",
+  deleted:  "Удалён",
 };
 
 export const DocumentsPage = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
@@ -45,94 +59,93 @@ export const DocumentsPage = () => {
     queryFn: () =>
       documentsApi.list({
         page,
+        page_size: 20,
         search: search || undefined,
-        status: statusFilter,
+        status: statusFilter || undefined,
       }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => documentsApi.delete(id),
+    mutationFn: documentsApi.delete,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["documents"] });
       message.success("Документ удалён");
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
-    onError: () => message.error("Ошибка при удалении документа"),
+    onError: () => message.error("Ошибка при удалении"),
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      documentsApi.updateStatus(id, status),
+      documentsApi.changeStatus(id, status),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["documents"] });
       message.success("Статус обновлён");
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
+    onError: () => message.error("Ошибка при смене статуса"),
   });
 
-  const columns: ColumnsType<Document> = [
+  const columns = [
     {
       title: "Название",
       dataIndex: "title",
       key: "title",
-      render: (title) => <Text strong>{title}</Text>,
+      ellipsis: true,
+      render: (text: string) => (
+        <Space>
+          <FileOutlined style={{ color: "#1677ff" }} />
+          {text}
+        </Space>
+      ),
     },
     {
-      title: t("common.status"),
+      title: "Статус",
       dataIndex: "status",
       key: "status",
-      width: 130,
-      render: (status: DocumentStatus) => {
-        const cfg = STATUS_CONFIG[status] ?? { color: "default", label: status };
-        return <Tag color={cfg.color}>{cfg.label}</Tag>;
-      },
+      width: 160,
+      render: (status: string, record: { id: string }) => (
+        <Select
+          value={status}
+          size="small"
+          style={{ width: 140 }}
+          loading={statusMutation.isPending}
+          onChange={(val) => statusMutation.mutate({ id: record.id, status: val })}
+          options={STATUS_OPTIONS.filter((o) => o.value).map((o) => ({
+            value: o.value,
+            label: <Tag color={STATUS_COLOR[o.value]}>{o.label}</Tag>,
+          }))}
+        />
+      ),
     },
     {
-      title: t("common.date"),
+      title: "Создан",
       dataIndex: "created_at",
       key: "created_at",
-      width: 130,
-      render: (d) => new Date(d).toLocaleDateString("ru-KZ"),
+      width: 120,
+      render: (d: string) => new Date(d).toLocaleDateString("ru-RU"),
     },
     {
-      title: t("common.actions"),
+      title: "Действия",
       key: "actions",
-      width: 160,
-      render: (_, record) => (
+      width: 100,
+      render: (_: unknown, record: { id: string }) => (
         <Space>
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            onClick={() => navigate(`/documents/${record.id}`)}
-          />
-          {record.status === "draft" && (
+          <Tooltip title="Редактировать">
             <Button
-              type="text"
               size="small"
-              onClick={() =>
-                statusMutation.mutate({ id: record.id, status: "active" })
-              }
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/documents/${record.id}/edit`)}
+            />
+          </Tooltip>
+          <Tooltip title="Удалить">
+            <Popconfirm
+              title="Удалить документ?"
+              onConfirm={() => deleteMutation.mutate(record.id)}
+              okText="Да"
+              cancelText="Нет"
             >
-              Активировать
-            </Button>
-          )}
-          {record.status === "active" && (
-            <Button
-              type="text"
-              size="small"
-              onClick={() =>
-                statusMutation.mutate({ id: record.id, status: "archived" })
-              }
-            >
-              В архив
-            </Button>
-          )}
-          <Popconfirm
-            title="Удалить документ?"
-            onConfirm={() => deleteMutation.mutate(record.id)}
-            okText={t("common.yes")}
-            cancelText={t("common.no")}
-          >
-            <Button type="text" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+              <Button size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          </Tooltip>
         </Space>
       ),
     },
@@ -144,56 +157,54 @@ export const DocumentsPage = () => {
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
           marginBottom: 24,
         }}
       >
         <Title level={3} style={{ margin: 0 }}>
-          {t("documents.title")}
+          Документы
         </Title>
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => navigate("/documents/create")}
         >
-          {t("documents.create")}
+          Создать документ
         </Button>
       </div>
 
-      <Space style={{ marginBottom: 16 }}>
-        <Input.Search
-          placeholder={t("common.search")}
-          style={{ width: 320 }}
-          allowClear
-          onSearch={setSearch}
-          onChange={(e) => !e.target.value && setSearch("")}
-        />
-        <Select
-          placeholder="Все статусы"
-          allowClear
-          style={{ width: 160 }}
-          onChange={(v) => { setStatusFilter(v); setPage(1); }}
-        >
-          <Option value="draft">Черновик</Option>
-          <Option value="active">Активный</Option>
-          <Option value="archived">Архив</Option>
-        </Select>
-      </Space>
+      <Card bordered={false} style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+        <Space style={{ marginBottom: 16 }}>
+          <Search
+            placeholder="Поиск по названию..."
+            onSearch={(val) => { setSearch(val); setPage(1); }}
+            onChange={(e) => { if (!e.target.value) { setSearch(""); setPage(1); } }}
+            style={{ width: 280 }}
+            prefix={<SearchOutlined />}
+            allowClear
+          />
+          <Select
+            value={statusFilter}
+            onChange={(val) => { setStatusFilter(val); setPage(1); }}
+            options={STATUS_OPTIONS}
+            style={{ width: 160 }}
+          />
+        </Space>
 
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={data?.items}
-        loading={isLoading}
-        pagination={{
-          current: page,
-          total: data?.total,
-          pageSize: data?.page_size ?? 20,
-          showSizeChanger: false,
-          showTotal: (total) => `Всего: ${total}`,
-          onChange: setPage,
-        }}
-      />
+        <Table
+          dataSource={data?.items ?? []}
+          columns={columns}
+          rowKey="id"
+          loading={isLoading}
+          pagination={{
+            current: page,
+            pageSize: 20,
+            total: data?.total ?? 0,
+            onChange: setPage,
+            showTotal: (total) => `Всего: ${total}`,
+          }}
+          locale={{ emptyText: "Документов не найдено" }}
+        />
+      </Card>
     </div>
   );
 };

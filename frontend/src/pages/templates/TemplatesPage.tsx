@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
 import {
   Button,
+  Card,
+  Col,
   Form,
   Input,
   Modal,
   Popconfirm,
+  Row,
   Select,
   Space,
   Table,
@@ -13,108 +15,110 @@ import {
   Typography,
   message,
 } from "antd";
-import {
-  DeleteOutlined,
-  EditOutlined,
-  PlusOutlined,
-} from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ColumnsType } from "antd/es/table";
-import type { DocumentTemplate, TemplateField } from "@/types";
-import {
-  type CreateTemplateRequest,
-  type UpdateTemplateRequest,
-  templatesApi,
-} from "@/api/documents";
-import { TemplateFieldsEditor } from "@/components/documents/TemplateFieldsEditor";
+import { templatesApi } from "@/api/documents";
+import type { TemplateField } from "@/api/documents";
 
 const { Title, Text } = Typography;
-const { Option } = Select;
+const { TextArea } = Input;
 
-const CATEGORIES = [
-  { value: "contract", label: "Договор" },
-  { value: "act", label: "Акт" },
-  { value: "invoice", label: "Счёт / Накладная" },
-  { value: "report", label: "Отчёт" },
-  { value: "order", label: "Приказ" },
-  { value: "application", label: "Заявление" },
-  { value: "other", label: "Прочее" },
+const FIELD_TYPES = [
+  { value: "text",     label: "Текст" },
+  { value: "number",   label: "Число" },
+  { value: "date",     label: "Дата" },
+  { value: "textarea", label: "Большой текст" },
+  { value: "select",   label: "Список" },
+  { value: "checkbox", label: "Флажок" },
 ];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  contract: "blue",
-  act: "green",
-  invoice: "gold",
-  report: "purple",
-  order: "red",
-  application: "cyan",
-  other: "default",
+// Значения соответствуют TemplateCategory enum на бэкенде
+const CATEGORY_OPTIONS = [
+  { value: "contract",    label: "Договор" },
+  { value: "act",         label: "Акт" },
+  { value: "invoice",     label: "Счёт / Накладная" },
+  { value: "report",      label: "Отчёт" },
+  { value: "order",       label: "Приказ" },
+  { value: "application", label: "Заявление" },
+  { value: "other",       label: "Прочее" },
+];
+
+const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
+  CATEGORY_OPTIONS.map((o) => [o.value, o.label])
+);
+
+interface FieldRow {
+  _key: string; // UI-only key
+  id: string;
+  name: string;
+  label: string;
+  type: TemplateField["type"];
+  required: boolean;
+  options?: string[];
+}
+
+const makeField = (): FieldRow => {
+  const uid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  return {
+    _key: uid,
+    id: uid,
+    name: `field_${uid}`,
+    label: "",
+    type: "text",
+    required: false,
+  };
 };
 
-const categoryLabel = (cat: string) =>
-  CATEGORIES.find((c) => c.value === cat)?.label ?? cat;
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_а-яё]/gi, "")
+    .slice(0, 80) || `field_${Date.now().toString(36)}`;
 
 export const TemplatesPage = () => {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const [form] = Form.useForm<CreateTemplateRequest & { id?: string }>();
+  const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [fields, setFields] = useState<TemplateField[]>([]);
-  const [search, setSearch] = useState("");
+  const [fields, setFields] = useState<FieldRow[]>([]);
+  const [form] = Form.useForm();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["templates", search],
-    queryFn: () => templatesApi.list({ search: search || undefined, active_only: false }),
+    queryKey: ["templates"],
+    queryFn: () => templatesApi.list({ page: 1, page_size: 100 }),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (d: CreateTemplateRequest) => templatesApi.create(d),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["templates"] });
-      message.success("Шаблон создан");
-      closeModal();
-    },
-    onError: () => message.error("Ошибка при создании шаблона"),
-  });
+  const templates = data?.items ?? [];
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateTemplateRequest }) =>
-      templatesApi.update(id, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["templates"] });
-      message.success("Шаблон обновлён");
-      closeModal();
+  const saveMutation = useMutation({
+    mutationFn: (values: { name: string; description?: string; category: string }) => {
+      const payload = {
+        ...values,
+        fields: fields.map(({ _key, ...f }) => f) as TemplateField[],
+      };
+      return editingId
+        ? templatesApi.update(editingId, payload)
+        : templatesApi.create(payload);
     },
-    onError: () => message.error("Ошибка при обновлении шаблона"),
+    onSuccess: () => {
+      message.success(editingId ? "Шаблон обновлён" : "Шаблон создан");
+      closeModal();
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      queryClient.invalidateQueries({ queryKey: ["templates-short"] });
+    },
+    onError: (err: { response?: { data?: { detail?: string } } }) =>
+      message.error(err?.response?.data?.detail ?? "Ошибка при сохранении"),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => templatesApi.delete(id),
+    mutationFn: templatesApi.delete,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["templates"] });
       message.success("Шаблон удалён");
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      queryClient.invalidateQueries({ queryKey: ["templates-short"] });
     },
-    onError: () => message.error("Ошибка при удалении шаблона"),
+    onError: () => message.error("Ошибка при удалении"),
   });
-
-  const openCreate = () => {
-    setEditingId(null);
-    setFields([]);
-    form.resetFields();
-    setModalOpen(true);
-  };
-
-  const openEdit = (tpl: DocumentTemplate) => {
-    setEditingId(tpl.id);
-    setFields(tpl.fields as TemplateField[]);
-    form.setFieldsValue({
-      name: tpl.name,
-      description: tpl.description,
-      category: tpl.category,
-    });
-    setModalOpen(true);
-  };
 
   const closeModal = () => {
     setModalOpen(false);
@@ -123,86 +127,108 @@ export const TemplatesPage = () => {
     form.resetFields();
   };
 
-  const handleSubmit = async () => {
-    const values = await form.validateFields();
-    const payload = { ...values, fields };
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data: payload });
-    } else {
-      createMutation.mutate(payload as CreateTemplateRequest);
-    }
+  const openCreate = () => {
+    closeModal();
+    setModalOpen(true);
   };
 
-  const columns: ColumnsType<DocumentTemplate> = [
+  const openEdit = (tmpl: {
+    id: string;
+    name: string;
+    description?: string;
+    category: string;
+    fields: TemplateField[];
+  }) => {
+    setEditingId(tmpl.id);
+    setFields(
+      (tmpl.fields ?? []).map((f) => ({
+        _key: f.id,
+        id: f.id,
+        name: f.name,
+        label: f.label,
+        type: f.type as TemplateField["type"],
+        required: f.required,
+        options: f.options,
+      }))
+    );
+    form.setFieldsValue({
+      name: tmpl.name,
+      description: tmpl.description,
+      category: tmpl.category,
+    });
+    setModalOpen(true);
+  };
+
+  const addField = () => setFields((prev) => [...prev, makeField()]);
+
+  const updateField = <K extends keyof FieldRow>(idx: number, key: K, val: FieldRow[K]) => {
+    setFields((prev) =>
+      prev.map((f, i) => {
+        if (i !== idx) return f;
+        const updated = { ...f, [key]: val };
+        // автогенерация name из label
+        if (key === "label" && typeof val === "string") {
+          updated.name = slugify(val);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const removeField = (idx: number) =>
+    setFields((prev) => prev.filter((_, i) => i !== idx));
+
+  const columns = [
     {
-      title: t("common.name"),
+      title: "Название",
       dataIndex: "name",
       key: "name",
-      render: (name, record) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{name}</Text>
-          {record.description && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {record.description}
-            </Text>
-          )}
-        </Space>
-      ),
+      render: (text: string) => <Text strong>{text}</Text>,
     },
     {
       title: "Категория",
       dataIndex: "category",
       key: "category",
       width: 150,
-      render: (cat) => (
-        <Tag color={CATEGORY_COLORS[cat] ?? "default"}>{categoryLabel(cat)}</Tag>
-      ),
+      render: (cat: string) =>
+        cat ? <Tag>{CATEGORY_LABEL[cat] ?? cat}</Tag> : "—",
     },
     {
       title: "Полей",
-      key: "fields_count",
+      dataIndex: "fields",
+      key: "fields",
       width: 80,
-      align: "center",
-      render: (_, record) => (
-        <Tag>{(record.fields as TemplateField[]).length}</Tag>
-      ),
+      render: (f: unknown[]) => f?.length ?? 0,
     },
     {
-      title: t("common.status"),
-      dataIndex: "is_active",
-      key: "is_active",
-      width: 100,
-      render: (active) => (
-        <Tag color={active ? "green" : "red"}>{active ? "Активен" : "Архив"}</Tag>
-      ),
+      title: "Описание",
+      dataIndex: "description",
+      key: "description",
+      ellipsis: true,
+      render: (d: string) => d || "—",
     },
     {
-      title: t("common.date"),
-      dataIndex: "created_at",
-      key: "created_at",
-      width: 120,
-      render: (d) => new Date(d).toLocaleDateString("ru-KZ"),
-    },
-    {
-      title: t("common.actions"),
+      title: "Действия",
       key: "actions",
-      width: 100,
-      render: (_, record) => (
+      width: 140,
+      render: (_: unknown, record: {
+        id: string;
+        name: string;
+        description?: string;
+        category: string;
+        fields: TemplateField[];
+      }) => (
         <Space>
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => openEdit(record)}
-          />
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+            Изменить
+          </Button>
           <Popconfirm
             title="Удалить шаблон?"
-            description="Шаблон будет деактивирован."
             onConfirm={() => deleteMutation.mutate(record.id)}
-            okText={t("common.yes")}
-            cancelText={t("common.no")}
+            okText="Да"
+            cancelText="Нет"
           >
-            <Button type="text" danger icon={<DeleteOutlined />} />
+            <Button size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
       ),
@@ -212,84 +238,133 @@ export const TemplatesPage = () => {
   return (
     <div>
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
+        style={{ display: "flex", justifyContent: "space-between", marginBottom: 24 }}
       >
         <Title level={3} style={{ margin: 0 }}>
-          {t("nav.templates")}
+          Шаблоны документов
         </Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           Создать шаблон
         </Button>
       </div>
 
-      <Input.Search
-        placeholder={t("common.search")}
-        style={{ maxWidth: 400, marginBottom: 16 }}
-        allowClear
-        onSearch={setSearch}
-        onChange={(e) => !e.target.value && setSearch("")}
-      />
-
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={data?.items}
-        loading={isLoading}
-        pagination={{
-          total: data?.total,
-          pageSize: data?.page_size ?? 20,
-          showSizeChanger: false,
-          showTotal: (total) => `Всего: ${total}`,
-        }}
-      />
+      <Card bordered={false} style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+        <Table
+          dataSource={templates}
+          columns={columns}
+          rowKey="id"
+          loading={isLoading}
+          locale={{ emptyText: "Шаблонов пока нет. Создайте первый!" }}
+        />
+      </Card>
 
       <Modal
-        title={editingId ? "Редактировать шаблон" : "Создать шаблон"}
+        title={editingId ? "Редактировать шаблон" : "Новый шаблон"}
         open={modalOpen}
         onCancel={closeModal}
-        onOk={handleSubmit}
-        okText={editingId ? t("common.save") : t("common.create")}
-        cancelText={t("common.cancel")}
-        confirmLoading={createMutation.isPending || updateMutation.isPending}
-        width={720}
+        onOk={() => form.submit()}
+        confirmLoading={saveMutation.isPending}
+        okText="Сохранить"
+        cancelText="Отмена"
+        width={700}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item
-            name="name"
-            label="Название шаблона"
-            rules={[{ required: true, message: "Введите название" }]}
-          >
-            <Input placeholder="Договор поставки товаров" maxLength={255} />
-          </Form.Item>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={saveMutation.mutate}
+          style={{ marginTop: 16 }}
+        >
+          <Row gutter={12}>
+            <Col span={16}>
+              <Form.Item
+                name="name"
+                label="Название шаблона"
+                rules={[{ required: true, message: "Введите название" }]}
+              >
+                <Input placeholder="Например: Трудовой договор" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="category"
+                label="Категория"
+                initialValue="other"
+              >
+                <Select options={CATEGORY_OPTIONS} />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item name="description" label="Описание">
-            <Input.TextArea rows={2} maxLength={2000} />
+            <TextArea rows={2} placeholder="Краткое описание шаблона" />
           </Form.Item>
 
-          <Form.Item
-            name="category"
-            label="Категория"
-            rules={[{ required: true, message: "Выберите категорию" }]}
-            initialValue="other"
-          >
-            <Select>
-              {CATEGORIES.map((c) => (
-                <Option key={c.value} value={c.value}>
-                  {c.label}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+          <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 12 }}>
+            <Text strong>Поля шаблона</Text>
+            <Button size="small" icon={<PlusOutlined />} onClick={addField}>
+              Добавить поле
+            </Button>
+          </div>
 
-          <Form.Item label="Поля шаблона">
-            <TemplateFieldsEditor value={fields} onChange={setFields} />
-          </Form.Item>
+          {fields.length === 0 && (
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Нет полей — документ будет без структурированных данных.
+            </Text>
+          )}
+
+          {fields.map((field, idx) => (
+            <Card
+              key={field._key}
+              size="small"
+              style={{ marginBottom: 8, background: "#fafafa" }}
+              extra={
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => removeField(idx)}
+                />
+              }
+            >
+              <Row gutter={8}>
+                <Col span={10}>
+                  <Input
+                    placeholder="Заголовок поля (Label)"
+                    value={field.label}
+                    onChange={(e) => updateField(idx, "label", e.target.value)}
+                    size="small"
+                  />
+                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>
+                    key: {field.name}
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <Select
+                    value={field.type}
+                    onChange={(val) => updateField(idx, "type", val)}
+                    options={FIELD_TYPES}
+                    size="small"
+                    style={{ width: "100%" }}
+                  />
+                </Col>
+                <Col span={6}>
+                  <Select
+                    value={field.required ? "required" : "optional"}
+                    onChange={(val) =>
+                      updateField(idx, "required", val === "required")
+                    }
+                    size="small"
+                    style={{ width: "100%" }}
+                    options={[
+                      { value: "optional", label: "Необяз." },
+                      { value: "required", label: "Обязат." },
+                    ]}
+                  />
+                </Col>
+              </Row>
+            </Card>
+          ))}
         </Form>
       </Modal>
     </div>
