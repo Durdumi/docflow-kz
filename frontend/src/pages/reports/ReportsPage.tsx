@@ -105,14 +105,21 @@ export const ReportsPage = () => {
   const handleDownload = async (record: Report) => {
     setDownloadingId(record.id);
     try {
-      const blob = await reportsApi.download(record.id);
-      const ext = record.format === "excel" ? "xlsx" : record.format;
-      const filename = `${record.title}.${ext}`;
-      const url = URL.createObjectURL(blob);
+      const response = await reportsApi.downloadRaw(record.id);
+      const disposition = response.headers["content-disposition"] ?? "";
+      const utf8Match = disposition.match(/filename\*=UTF-8''(.+)/i);
+      const ext = record.format === "excel" ? "xlsx" : (record.format ?? "pdf");
+      const filename = utf8Match
+        ? decodeURIComponent(utf8Match[1])
+        : `${record.title}.${ext}`;
+
+      const url = URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
       message.error("Не удалось скачать файл");

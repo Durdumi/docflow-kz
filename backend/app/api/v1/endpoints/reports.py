@@ -84,17 +84,22 @@ async def download_report(
     client = get_minio_client()
     response = client.get_object(settings.MINIO_BUCKET_REPORTS, report.file_url)
 
+    import urllib.parse
+
     filename = report.file_url.split("/")[-1]
     ext = filename.rsplit(".", 1)[-1].lower()
     content_type = (
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         if ext == "xlsx" else "application/pdf"
     )
+    encoded_filename = urllib.parse.quote(filename)
 
     return StreamingResponse(
         response,
         media_type=content_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}",
+        },
     )
 
 

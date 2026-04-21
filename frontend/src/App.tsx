@@ -17,6 +17,9 @@ import { DocumentsPage } from "@/pages/documents/DocumentsPage";
 import { CreateDocumentPage } from "@/pages/documents/CreateDocumentPage";
 import { TemplatesPage } from "@/pages/templates/TemplatesPage";
 import { ReportsPage } from "@/pages/reports/ReportsPage";
+import { SettingsPage } from "@/pages/settings/SettingsPage";
+import { UsersPage } from "@/pages/users/UsersPage";
+import { ImportsPage } from "@/pages/imports/ImportsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,6 +86,9 @@ function App() {
                   <Route path="/documents/create" element={<CreateDocumentPage />} />
                   <Route path="/templates" element={<TemplatesPage />} />
                   <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/users" element={<UsersPage />} />
+                  <Route path="/imports" element={<ImportsPage />} />
                 </Route>
               </Route>
 
