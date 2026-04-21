@@ -100,17 +100,33 @@ export interface Document {
 }
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
+export type ReportFormat = "pdf" | "excel" | "word";
+
 export interface Report {
   id: string;
   title: string;
   type: string;
+  format: ReportFormat;
   status: ReportStatus;
   period_from?: string;
   period_to?: string;
   file_url?: string;
+  file_size?: number;
   error_message?: string;
   created_by_id: string;
+  organization_id: string;
   created_at: string;
+  updated_at: string;
+  completed_at?: string;
+}
+
+export interface ReportCreate {
+  title: string;
+  type: string;
+  format?: ReportFormat;
+  period_from?: string;
+  period_to?: string;
+  parameters?: Record<string, unknown>;
 }
 
 // ─── API Response Wrappers ────────────────────────────────────────────────────

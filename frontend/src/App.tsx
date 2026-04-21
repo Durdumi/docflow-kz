@@ -16,6 +16,7 @@ import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { DocumentsPage } from "@/pages/documents/DocumentsPage";
 import { CreateDocumentPage } from "@/pages/documents/CreateDocumentPage";
 import { TemplatesPage } from "@/pages/templates/TemplatesPage";
+import { ReportsPage } from "@/pages/reports/ReportsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,7 +82,7 @@ function App() {
                   <Route path="/documents" element={<DocumentsPage />} />
                   <Route path="/documents/create" element={<CreateDocumentPage />} />
                   <Route path="/templates" element={<TemplatesPage />} />
-                  {/* <Route path="/reports/*" element={<ReportsPage />} /> */}
+                  <Route path="/reports" element={<ReportsPage />} />
                 </Route>
               </Route>
 

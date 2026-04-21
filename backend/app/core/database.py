@@ -77,14 +77,18 @@ async def create_tenant_schema(schema_name: str) -> None:
 
 
 async def apply_tenant_tables(schema_name: str) -> None:
-    """Создаёт таблицы tenant schema (document_templates, documents).
+    """Создаёт таблицы tenant schema (document_templates, documents, reports).
     Вызывается при регистрации новой организации.
     """
-    import app.models.documents  # noqa: F401 — регистрирует модели в TenantBase.metadata
+    import app.models.documents  # noqa: F401
+    import app.models.reports    # noqa: F401
 
     async with engine.begin() as conn:
-        await conn.execute(text(f'SET LOCAL search_path TO "{schema_name}"'))
+        # Только tenant schema — без public в fallback, иначе create_all находит
+        # одноимённые таблицы из public и пропускает создание в tenant schema.
+        await conn.execute(text(f'SET search_path TO "{schema_name}"'))
         await conn.run_sync(TenantBase.metadata.create_all)
+        await conn.execute(text("SET search_path TO public"))
 
 
 async def drop_tenant_schema(schema_name: str) -> None:

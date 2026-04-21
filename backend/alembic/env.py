@@ -32,12 +32,12 @@ else:
 
 def do_run_migrations(connection: Connection) -> None:
     if TENANT_SCHEMA:
-        connection.execute(text(f'SET LOCAL search_path TO "{TENANT_SCHEMA}"'))
+        # SET (не LOCAL) — session-level, чтобы alembic_version нашёлся в tenant schema
+        connection.execute(text(f'SET search_path TO "{TENANT_SCHEMA}"'))
 
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        # У каждой tenant schema своя alembic_version таблица в её schema
         version_table="alembic_version",
         include_schemas=False,
     )
