@@ -1,0 +1,197 @@
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+import LanguageDetector from "i18next-browser-languagedetector";
+
+const ru = {
+  translation: {
+    // ─── Common ───────────────────────────────────────────────
+    common: {
+      save: "Сохранить",
+      cancel: "Отмена",
+      delete: "Удалить",
+      edit: "Редактировать",
+      create: "Создать",
+      search: "Поиск",
+      loading: "Загрузка...",
+      error: "Ошибка",
+      success: "Успешно",
+      confirm: "Подтвердить",
+      back: "Назад",
+      next: "Далее",
+      close: "Закрыть",
+      actions: "Действия",
+      status: "Статус",
+      date: "Дата",
+      name: "Название",
+      yes: "Да",
+      no: "Нет",
+    },
+    // ─── Auth ─────────────────────────────────────────────────
+    auth: {
+      login: "Войти",
+      logout: "Выйти",
+      register: "Регистрация",
+      email: "Email",
+      password: "Пароль",
+      forgotPassword: "Забыли пароль?",
+      noAccount: "Нет аккаунта?",
+      hasAccount: "Уже есть аккаунт?",
+      loginTitle: "Вход в DocFlow",
+      registerTitle: "Регистрация организации",
+      firstName: "Имя",
+      lastName: "Фамилия",
+      middleName: "Отчество",
+      phone: "Телефон",
+      orgName: "Название организации",
+      orgEmail: "Email организации",
+      binNumber: "БИН",
+      city: "Город",
+    },
+    // ─── Navigation ───────────────────────────────────────────
+    nav: {
+      dashboard: "Дашборд",
+      documents: "Документы",
+      reports: "Отчёты",
+      templates: "Шаблоны",
+      imports: "Импорт данных",
+      users: "Пользователи",
+      settings: "Настройки",
+      organization: "Организация",
+    },
+    // ─── Documents ────────────────────────────────────────────
+    documents: {
+      title: "Документы",
+      create: "Создать документ",
+      templates: "Шаблоны",
+      draft: "Черновик",
+      active: "Активный",
+      archived: "Архив",
+      noDocuments: "Документы не найдены",
+    },
+    // ─── Reports ──────────────────────────────────────────────
+    reports: {
+      title: "Отчёты",
+      generate: "Сформировать отчёт",
+      weekly: "Еженедельный",
+      monthly: "Ежемесячный",
+      quarterly: "Квартальный",
+      annual: "Годовой",
+      pending: "Ожидает",
+      generating: "Генерируется",
+      ready: "Готов",
+      failed: "Ошибка",
+      download: "Скачать",
+    },
+    // ─── Dashboard ────────────────────────────────────────────
+    dashboard: {
+      welcome: "Добро пожаловать",
+      totalDocuments: "Всего документов",
+      totalReports: "Отчётов за месяц",
+      pendingTasks: "Ожидают действий",
+      recentDocuments: "Последние документы",
+      recentReports: "Последние отчёты",
+    },
+  },
+};
+
+const kk = {
+  translation: {
+    common: {
+      save: "Сақтау",
+      cancel: "Болдырмау",
+      delete: "Жою",
+      edit: "Өңдеу",
+      create: "Жасау",
+      search: "Іздеу",
+      loading: "Жүктелуде...",
+      error: "Қате",
+      success: "Сәтті",
+      confirm: "Растау",
+      back: "Артқа",
+      next: "Келесі",
+      close: "Жабу",
+      actions: "Әрекеттер",
+      status: "Мәртебе",
+      date: "Күн",
+      name: "Атауы",
+      yes: "Иә",
+      no: "Жоқ",
+    },
+    auth: {
+      login: "Кіру",
+      logout: "Шығу",
+      register: "Тіркелу",
+      email: "Email",
+      password: "Құпия сөз",
+      forgotPassword: "Құпия сөзді ұмыттыңыз ба?",
+      noAccount: "Тіркелгіңіз жоқ па?",
+      hasAccount: "Тіркелгіңіз бар ма?",
+      loginTitle: "DocFlow жүйесіне кіру",
+      registerTitle: "Ұйымды тіркеу",
+      firstName: "Аты",
+      lastName: "Тегі",
+      middleName: "Әкесінің аты",
+      phone: "Телефон",
+      orgName: "Ұйымның атауы",
+      orgEmail: "Ұйымның Email-і",
+      binNumber: "БСН",
+      city: "Қала",
+    },
+    nav: {
+      dashboard: "Басқару тақтасы",
+      documents: "Құжаттар",
+      reports: "Есептер",
+      templates: "Үлгілер",
+      imports: "Деректерді импорттау",
+      users: "Пайдаланушылар",
+      settings: "Параметрлер",
+      organization: "Ұйым",
+    },
+    documents: {
+      title: "Құжаттар",
+      create: "Құжат жасау",
+      templates: "Үлгілер",
+      draft: "Жоба",
+      active: "Белсенді",
+      archived: "Мұрағат",
+      noDocuments: "Құжаттар табылмады",
+    },
+    reports: {
+      title: "Есептер",
+      generate: "Есеп қалыптастыру",
+      weekly: "Апталық",
+      monthly: "Айлық",
+      quarterly: "Тоқсандық",
+      annual: "Жылдық",
+      pending: "Күтуде",
+      generating: "Қалыптастырылуда",
+      ready: "Дайын",
+      failed: "Қате",
+      download: "Жүктеу",
+    },
+    dashboard: {
+      welcome: "Қош келдіңіз",
+      totalDocuments: "Барлық құжаттар",
+      totalReports: "Айдағы есептер",
+      pendingTasks: "Әрекет күтуде",
+      recentDocuments: "Соңғы құжаттар",
+      recentReports: "Соңғы есептер",
+    },
+  },
+};
+
+i18n
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources: { ru, kk },
+    fallbackLng: "ru",
+    supportedLngs: ["ru", "kk"],
+    interpolation: { escapeValue: false },
+    detection: {
+      order: ["localStorage", "navigator"],
+      lookupLocalStorage: "docflow-lang",
+    },
+  });
+
+export default i18n;

@@ -1,0 +1,130 @@
+version: "3.9"
+
+services:
+  # ─── PostgreSQL ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: docflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-docflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docflow_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-docflow}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-docflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis ────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: docflow_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── MinIO (S3-совместимое хранилище) ─────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: docflow_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin_secret}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ─── FastAPI Backend ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: docflow_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ─── Celery Worker ────────────────────────────────────────────
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: docflow_celery
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+      - redis
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
+
+  # ─── Celery Beat (планировщик) ────────────────────────────────
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: docflow_celery_beat
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - celery_worker
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+
+  # ─── Frontend (dev) ───────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: docflow_frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
