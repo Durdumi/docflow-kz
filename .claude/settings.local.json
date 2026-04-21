@@ -3,7 +3,18 @@
     "allow": [
       "Bash(docker compose *)",
       "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/register -H 'Content-Type: application/json' -d '{ *)",
-      "Bash(python -m json.tool)"
+      "Bash(python -m json.tool)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -s http://localhost:8000/openapi.json)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(p\\) for p in d['paths'] if 'report' in p]\")",
+      "Bash(curl -s \"http://localhost:8000/api/v1/reports/00000000-0000-0000-0000-000000000000/download-url\")",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' --data-raw '{\"email\":\"damir.gubaidulin@med-tech.com\",\"password\":\"Admin1234!\"}')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"damir.gubaidulin@med-tech.kz\",\"password\":\"Admin1234!\"}')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"verify@verifyorg.kz\",\"password\":\"TestPass123!\"}')",
+      "Bash(curl -s \"http://localhost:9000/reports/626ceba6-e334-47d7-8baa-56145754d60f/April%20Monthly_e186e5ac-56ac-4613-93ed-3b6651f51ced.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=minioadmin%2F20260421%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20260421T105324Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=fb34a31ba59e94a3bc39bd7a646cea30357d4c4657dbc2054fa2b4abb630cbfb\")",
+      "Bash(git restore *)"
     ]
   }
 }
