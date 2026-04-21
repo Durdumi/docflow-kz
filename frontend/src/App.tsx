@@ -13,10 +13,9 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
-
-// Lazy imports — добавляем по мере реализации
-// const DocumentsPage = lazy(() => import("@/pages/documents/DocumentsPage"));
-// const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage"));
+import { DocumentsPage } from "@/pages/documents/DocumentsPage";
+import { CreateDocumentPage } from "@/pages/documents/CreateDocumentPage";
+import { TemplatesPage } from "@/pages/templates/TemplatesPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,8 +78,9 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
                   <Route path="/dashboard" element={<DashboardPage />} />
-                  {/* Добавляем по мере разработки: */}
-                  {/* <Route path="/documents/*" element={<DocumentsPage />} /> */}
+                  <Route path="/documents" element={<DocumentsPage />} />
+                  <Route path="/documents/create" element={<CreateDocumentPage />} />
+                  <Route path="/templates" element={<TemplatesPage />} />
                   {/* <Route path="/reports/*" element={<ReportsPage />} /> */}
                 </Route>
               </Route>

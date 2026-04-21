@@ -2,11 +2,11 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from slugify import slugify
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import create_tenant_schema
+from app.core.database import apply_tenant_tables, create_tenant_schema
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -60,12 +60,13 @@ class AuthService:
         self.db.add(organization)
         await self.db.flush()  # Получаем ID организации
 
-        # Создаём PostgreSQL schema для этого тенанта
+        # Создаём PostgreSQL schema и таблицы для этого тенанта
         await create_tenant_schema(schema_name)
+        await apply_tenant_tables(schema_name)
 
         # Создаём пользователя-админа
         user = User(
-            email=data.email,
+            email=data.email.lower().strip(),
             hashed_password=get_password_hash(data.password),
             first_name=data.first_name,
             last_name=data.last_name,
@@ -158,7 +159,7 @@ class AuthService:
     # ─── Private Helpers ──────────────────────────────────────────────────────
     async def _get_user_by_email(self, email: str) -> User | None:
         result = await self.db.execute(
-            select(User).where(User.email == email.lower())
+            select(User).where(func.lower(User.email) == email.lower().strip())
         )
         return result.scalar_one_or_none()
 

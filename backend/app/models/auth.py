@@ -31,6 +31,7 @@ class UserRole(str, Enum):
 
 
 class OrgPlan(str, Enum):
+    TRIAL = "trial"         # Пробный период
     FREE = "free"           # До 5 пользователей, 100 документов
     STARTER = "starter"     # До 20 пользователей
     BUSINESS = "business"   # До 100 пользователей

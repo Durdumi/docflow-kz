@@ -1,21 +1,23 @@
+import bcrypt
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ─── Password ─────────────────────────────────────────────────────────────────
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"),
+        hashed_password.encode("utf-8"),
+    )
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 # ─── JWT ──────────────────────────────────────────────────────────────────────
@@ -34,9 +36,6 @@ def create_refresh_token(subject: str | Any) -> str:
 
 
 def decode_token(token: str) -> dict[str, Any]:
-    """
-    Декодирует JWT. Выбрасывает JWTError если токен невалиден/истёк.
-    """
     return jwt.decode(
         token,
         settings.JWT_SECRET_KEY,
@@ -45,7 +44,6 @@ def decode_token(token: str) -> dict[str, Any]:
 
 
 def verify_access_token(token: str) -> str | None:
-    """Возвращает user_id из токена или None."""
     try:
         payload = decode_token(token)
         if payload.get("type") != "access":

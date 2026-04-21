@@ -25,9 +25,13 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-# ─── Base Model ───────────────────────────────────────────────────────────────
+# ─── Base Models ──────────────────────────────────────────────────────────────
 class Base(DeclarativeBase):
-    pass
+    """Public schema (organizations, users, ...)."""
+
+
+class TenantBase(DeclarativeBase):
+    """Tenant schema (documents, templates, ...) — schema-per-org."""
 
 
 # ─── Dependency ───────────────────────────────────────────────────────────────
@@ -70,6 +74,17 @@ async def create_tenant_schema(schema_name: str) -> None:
     """Создаёт schema для новой организации."""
     async with engine.begin() as conn:
         await conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}"'))
+
+
+async def apply_tenant_tables(schema_name: str) -> None:
+    """Создаёт таблицы tenant schema (document_templates, documents).
+    Вызывается при регистрации новой организации.
+    """
+    import app.models.documents  # noqa: F401 — регистрирует модели в TenantBase.metadata
+
+    async with engine.begin() as conn:
+        await conn.execute(text(f'SET LOCAL search_path TO "{schema_name}"'))
+        await conn.run_sync(TenantBase.metadata.create_all)
 
 
 async def drop_tenant_schema(schema_name: str) -> None:
