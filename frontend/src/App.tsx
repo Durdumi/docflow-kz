@@ -20,6 +20,8 @@ import { ReportsPage } from "@/pages/reports/ReportsPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 import { UsersPage } from "@/pages/users/UsersPage";
 import { ImportsPage } from "@/pages/imports/ImportsPage";
+import { TaskBoardPage } from "@/pages/tasks/TaskBoardPage";
+import { CalendarPage } from "@/pages/calendar/CalendarPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -89,6 +91,8 @@ function App() {
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/users" element={<UsersPage />} />
                   <Route path="/imports" element={<ImportsPage />} />
+                  <Route path="/tasks" element={<TaskBoardPage />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
                 </Route>
               </Route>
 

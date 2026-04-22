@@ -13,6 +13,8 @@ import {
 } from "antd";
 import {
   BellOutlined,
+  CalendarOutlined,
+  CheckSquareOutlined,
   DashboardOutlined,
   FileOutlined,
   FileTextOutlined,
@@ -36,8 +38,10 @@ const MENU_ITEMS = [
   { key: "/documents", icon: <FileOutlined />, labelKey: "nav.documents" },
   { key: "/reports", icon: <FileTextOutlined />, labelKey: "nav.reports" },
   { key: "/templates", icon: <FileTextOutlined />, labelKey: "nav.templates" },
-  { key: "/imports", icon: <ImportOutlined />, labelKey: "nav.imports" },
-  { key: "/users", icon: <TeamOutlined />, labelKey: "nav.users", adminOnly: true },
+  { key: "/imports",   icon: <ImportOutlined />,     labelKey: "nav.imports" },
+  { key: "/tasks",    icon: <CheckSquareOutlined />, labelKey: "nav.tasks" },
+  { key: "/calendar", icon: <CalendarOutlined />,    labelKey: "nav.calendar" },
+  { key: "/users",    icon: <TeamOutlined />,         labelKey: "nav.users", adminOnly: true },
   { key: "/settings", icon: <SettingOutlined />, labelKey: "nav.settings" },
 ];
 

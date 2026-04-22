@@ -30,7 +30,11 @@
       "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/api/v1/telegram/webhook -H 'Content-Type: application/json' -d '{\"message\":{\"chat\":{\"id\":\"999\"},\"text\":\"/start\"}}')",
       "Bash(curl -s \"https://api.telegram.org/bot8618957425:AAEGfaZ4aZxQyo6B8G6itTh2zxfWRyc9iYg/getUpdates\")",
       "Bash(curl -s \"http://localhost:8000/api/v1/telegram/test/123456789\")",
-      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"damir.gubaidulin@med-tech.kz\",\"password\":\"test123456\"}')"
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"damir.gubaidulin@med-tech.kz\",\"password\":\"test123456\"}')",
+      "Bash(python3 -c \"import json,sys; paths=json.load\\(sys.stdin\\)['paths']; print\\('\\\\n'.join\\(k for k in paths if '/tasks' in k or '/calendar' in k\\)\\)\")",
+      "Bash(curl -s http://localhost:8000/api/v1/tasks -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:8000/api/v1/calendar -o /dev/null -w \"%{http_code}\")",
+      "Bash(curl -s http://localhost:3000/)"
     ]
   }
 }
