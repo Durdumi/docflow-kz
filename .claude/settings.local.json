@@ -23,7 +23,9 @@
       "Read(//tmp/**)",
       "Bash(2>/dev/null)",
       "Bash(echo \"exit: $?\")",
-      "Bash(curl -s http://localhost:3000/imports -o /dev/null -w \"%{http_code}\")"
+      "Bash(curl -s http://localhost:3000/imports -o /dev/null -w \"%{http_code}\")",
+      "Bash(git commit -m 'feat: Import Engine + frontend routes fix *)",
+      "Bash(git commit *)"
     ]
   }
 }

@@ -39,8 +39,10 @@ class OrganizationRead(BaseModel):
 
 class OrganizationUpdate(BaseModel):
     name: str | None = Field(None, min_length=2, max_length=255)
+    contact_email: EmailStr | None = None
     contact_phone: str | None = None
     city: str | None = None
+    bin_number: str | None = Field(None, min_length=12, max_length=12)
     locale: str | None = Field(None, pattern="^(ru|kk|en)$")
     timezone: str | None = None
 
