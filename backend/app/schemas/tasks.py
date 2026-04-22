@@ -14,6 +14,7 @@ class TaskCreate(BaseModel):
     related_document_id: uuid.UUID | None = None
     related_report_id: uuid.UUID | None = None
     position: int = 0
+    label_color: str | None = None
 
 
 class TaskUpdate(BaseModel):
@@ -24,6 +25,7 @@ class TaskUpdate(BaseModel):
     due_date: datetime | None = None
     assignee_id: uuid.UUID | None = None
     position: int | None = None
+    label_color: str | None = None
 
 
 class TaskRead(BaseModel):
@@ -42,6 +44,7 @@ class TaskRead(BaseModel):
     related_document_id: uuid.UUID | None
     related_report_id: uuid.UUID | None
     position: int
+    label_color: str | None
     created_at: datetime
     updated_at: datetime
 

@@ -83,7 +83,9 @@ async def apply_tenant_tables(schema_name: str) -> None:
     import app.models.documents  # noqa: F401
     import app.models.reports    # noqa: F401
     import app.models.imports    # noqa: F401
-    import app.models.tasks      # noqa: F401
+    import app.models.tasks        # noqa: F401
+    import app.models.board_config # noqa: F401
+    import app.models.activity     # noqa: F401
 
     async with engine.begin() as conn:
         # Только tenant schema — без public в fallback, иначе create_all находит

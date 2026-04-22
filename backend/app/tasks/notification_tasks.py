@@ -110,3 +110,83 @@ def run_telegram_polling(self):
             await r.aclose()
 
     asyncio.run(_run())
+
+
+@celery_app.task(name="notification_tasks.daily_task_reminders")
+def daily_task_reminders():
+    """Запускается каждый день в 9:00 — напоминает об активных тасках."""
+    import asyncio
+    asyncio.run(_send_daily_reminders())
+
+
+async def _send_daily_reminders():
+    import uuid as uuid_module
+    from datetime import datetime, UTC
+    from sqlalchemy import select, text
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
+    from app.core.config import settings
+    from app.models.auth import Organization, User
+    from app.models.tasks import Task
+    from app.services.telegram_service import send_message
+
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with SessionLocal() as db:
+        orgs_result = await db.execute(select(Organization))
+        orgs = orgs_result.scalars().all()
+
+        for org in orgs:
+            schema = org.schema_name
+            try:
+                await db.execute(text(f'SET search_path TO "{schema}", public'))
+
+                tasks_result = await db.execute(
+                    select(Task).where(
+                        Task.organization_id == org.id,
+                        Task.status.in_(["todo", "in_progress", "review"]),
+                        Task.assignee_id.isnot(None),
+                    )
+                )
+                tasks = tasks_result.scalars().all()
+
+                tasks_by_user: dict = {}
+                for task in tasks:
+                    uid = str(task.assignee_id)
+                    tasks_by_user.setdefault(uid, []).append(task)
+
+                await db.execute(text("SET search_path TO public"))
+
+                for user_id, user_tasks in tasks_by_user.items():
+                    user_result = await db.execute(
+                        select(User).where(User.id == uuid_module.UUID(user_id))
+                    )
+                    user = user_result.scalar_one_or_none()
+                    if not user or not user.telegram_chat_id:
+                        continue
+
+                    task_lines = []
+                    for t in user_tasks[:5]:
+                        overdue = t.due_date and t.due_date.replace(tzinfo=None) < datetime.utcnow()
+                        line = f"{'🔴' if overdue else '📋'} {t.title}"
+                        if t.due_date:
+                            line += f" (до {t.due_date.strftime('%d.%m')})"
+                        task_lines.append(line)
+
+                    if len(user_tasks) > 5:
+                        task_lines.append(f"...и ещё {len(user_tasks) - 5} задач")
+
+                    msg = (
+                        f"☀️ Доброе утро, {user.first_name}!\n\n"
+                        f"У вас <b>{len(user_tasks)}</b> активных задач:\n"
+                        + "\n".join(task_lines)
+                        + "\n\nОткройте DocFlow KZ для управления задачами."
+                    )
+                    await send_message(user.telegram_chat_id, msg)
+
+            except Exception as e:
+                print(f"Error processing org {org.slug}: {e}")
+                continue
+
+    await engine.dispose()

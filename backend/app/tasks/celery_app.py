@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 from app.core.config import settings
 
 celery_app = Celery(
@@ -24,7 +25,11 @@ celery_app.conf.update(
     beat_schedule={
         "telegram-polling": {
             "task": "notification_tasks.run_telegram_polling",
-            "schedule": 6.0,  # каждые 6 сек (задача polling timeout=5 + Redis lock)
+            "schedule": 6.0,
+        },
+        "daily-task-reminders": {
+            "task": "notification_tasks.daily_task_reminders",
+            "schedule": crontab(hour=9, minute=0),
         },
     },
 )

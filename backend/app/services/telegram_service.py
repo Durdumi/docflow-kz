@@ -65,6 +65,46 @@ async def send_user_invited(
     return await send_telegram_message(chat_id, text)
 
 
+async def send_message(chat_id: str, text: str) -> bool:
+    print(f"[Telegram] BOT_TOKEN exists: {bool(settings.TELEGRAM_BOT_TOKEN)}, chat_id: {chat_id}")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(
+                f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+            )
+            print(f"[Telegram] Response: {response.status_code} {response.text[:200]}")
+            return response.status_code == 200
+    except Exception as e:
+        print(f"[Telegram] Error: {e}")
+        return False
+
+
+async def send_task_assigned(
+    chat_id: str,
+    task_title: str,
+    due_date=None,
+    priority: str = "medium",
+) -> bool:
+    print(f"[Telegram] send_task_assigned -> chat_id={chat_id}, title={task_title}")
+    priority_emoji = {"low": "↓", "medium": "→", "high": "↑", "urgent": "🔥"}.get(priority, "→")
+    due_text = ""
+    if due_date:
+        from datetime import datetime
+        if isinstance(due_date, str):
+            due_date = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
+        due_text = f"\n📅 Дедлайн: {due_date.strftime('%d.%m.%Y')}"
+    text = (
+        f"📌 <b>Вам назначена новая задача!</b>\n\n"
+        f"📋 {task_title}\n"
+        f"{priority_emoji} Приоритет: {priority}{due_text}\n\n"
+        f"Откройте DocFlow KZ для просмотра деталей."
+    )
+    result = await send_message(chat_id, text)
+    print(f"[Telegram] send_task_assigned result: {result}")
+    return result
+
+
 async def send_deadline_reminder(chat_id: str, doc_title: str, days_left: int) -> bool:
     emoji = "🔴" if days_left <= 1 else "🟡" if days_left <= 3 else "🟢"
     text = (

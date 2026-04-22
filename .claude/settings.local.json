@@ -34,7 +34,19 @@
       "Bash(python3 -c \"import json,sys; paths=json.load\\(sys.stdin\\)['paths']; print\\('\\\\n'.join\\(k for k in paths if '/tasks' in k or '/calendar' in k\\)\\)\")",
       "Bash(curl -s http://localhost:8000/api/v1/tasks -o /dev/null -w \"%{http_code}\")",
       "Bash(curl -s http://localhost:8000/api/v1/calendar -o /dev/null -w \"%{http_code}\")",
-      "Bash(curl -s http://localhost:3000/)"
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(kill %1)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e' http://127.0.0.1:27123/)",
+      "Bash(npm install *)",
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" -H \"Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e\" http://127.0.0.1:27123/vault/)",
+      "Bash(node -e ' *)",
+      "Bash(curl -s -H \"Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e\" http://127.0.0.1:27123/vault/)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); JSON.parse\\(d\\).files.forEach\\(f=>console.log\\(f\\)\\)\")",
+      "Bash(curl -s -H \"Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e\" \"http://127.0.0.1:27123/vault/\")",
+      "Bash(curl -s -H \"Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e\" \"http://127.0.0.1:27123/vault/DocFlow%20KZ/\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://127.0.0.1:27123/\" -H \"Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e\")",
+      "Bash(curl -s http://127.0.0.1:27123/vault/DocFlow%20KZ/README.md -H 'Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e')",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:27123/vault/DocFlow%20KZ/%D0%92%D1%81%D1%82%D1%80%D0%B5%D1%87%D0%B8/2026-04-22.md -H 'Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e')"
     ]
   }
 }
