@@ -20,7 +20,10 @@
       "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"verify@verifyorg.kz\",\"password\":\"__TRACKED_VAR__\"}')",
       "Bash(xargs grep *)",
       "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"verify@verifyorg.kz\",\"password\":\"test123456\"}')",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(2>/dev/null)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -s http://localhost:3000/imports -o /dev/null -w \"%{http_code}\")"
     ]
   }
 }
