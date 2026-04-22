@@ -25,7 +25,12 @@
       "Bash(echo \"exit: $?\")",
       "Bash(curl -s http://localhost:3000/imports -o /dev/null -w \"%{http_code}\")",
       "Bash(git commit -m 'feat: Import Engine + frontend routes fix *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(curl -s \"https://api.telegram.org/bot8618957425:AAEGfaZ4aZxQyo6B8G6itTh2zxfWRyc9iYg/getMe\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8000/api/v1/telegram/webhook -H 'Content-Type: application/json' -d '{\"message\":{\"chat\":{\"id\":\"999\"},\"text\":\"/start\"}}')",
+      "Bash(curl -s \"https://api.telegram.org/bot8618957425:AAEGfaZ4aZxQyo6B8G6itTh2zxfWRyc9iYg/getUpdates\")",
+      "Bash(curl -s \"http://localhost:8000/api/v1/telegram/test/123456789\")",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"damir.gubaidulin@med-tech.kz\",\"password\":\"test123456\"}')"
     ]
   }
 }

@@ -144,3 +144,4 @@ class InviteUserRequest(BaseModel):
     role: UserRole = UserRole.USER
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
+    telegram_chat_id: str | None = None

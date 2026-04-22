@@ -80,6 +80,7 @@ def generate_report_task(self, report_id: str, schema_name: str):
             object_name = upload_file("reports", file_bytes, filename, content_type)
         except Exception as exc:
             # ── Шаг 2b: записать FAILED ────────────────────────────────────
+            failed_created_by = None
             engine, SessionLocal = await _make_session()
             try:
                 async with SessionLocal() as db:
@@ -89,14 +90,44 @@ def generate_report_task(self, report_id: str, schema_name: str):
                     )
                     report = result.scalar_one_or_none()
                     if report:
+                        failed_created_by = report.created_by_id
                         report.status = ReportStatus.FAILED
                         report.error_message = str(exc)
                         await db.commit()
             finally:
                 await engine.dispose()
+
+            # Telegram уведомление — FAILED
+            try:
+                from app.models.auth import User
+                from app.services.telegram_service import send_report_failed
+
+                async def _notify_failed():
+                    engine, SessionLocal = await _make_session()
+                    try:
+                        async with SessionLocal() as notify_db:
+                            user_result = await notify_db.execute(
+                                select(User).where(User.id == failed_created_by)
+                            )
+                            user = user_result.scalar_one_or_none()
+                            if user and user.telegram_chat_id:
+                                await send_report_failed(
+                                    user.telegram_chat_id,
+                                    report_snapshot.get("title", ""),
+                                    str(exc),
+                                )
+                    finally:
+                        await engine.dispose()
+
+                await _notify_failed()
+            except Exception:
+                pass
+
             raise self.retry(exc=exc, countdown=60)
 
         # ── Шаг 3: выставить READY ──────────────────────────────────────────
+        saved_title = report_snapshot["title"]
+        saved_created_by = None
         engine, SessionLocal = await _make_session()
         try:
             async with SessionLocal() as db:
@@ -106,6 +137,7 @@ def generate_report_task(self, report_id: str, schema_name: str):
                 )
                 report = result.scalar_one_or_none()
                 if report:
+                    saved_created_by = report.created_by_id
                     report.status = ReportStatus.READY
                     report.file_url = object_name
                     report.file_size = len(file_bytes)
@@ -113,5 +145,31 @@ def generate_report_task(self, report_id: str, schema_name: str):
                     await db.commit()
         finally:
             await engine.dispose()
+
+        # ── Шаг 4: Telegram уведомление — READY ────────────────────────────
+        try:
+            from app.models.auth import User
+            from app.services.telegram_service import send_report_ready
+
+            async def _notify_ready():
+                engine, SessionLocal = await _make_session()
+                try:
+                    async with SessionLocal() as notify_db:
+                        user_result = await notify_db.execute(
+                            select(User).where(User.id == saved_created_by)
+                        )
+                        user = user_result.scalar_one_or_none()
+                        if user and user.telegram_chat_id:
+                            await send_report_ready(
+                                user.telegram_chat_id,
+                                saved_title,
+                                str(report_uuid),
+                            )
+                finally:
+                    await engine.dispose()
+
+            await _notify_ready()
+        except Exception:
+            pass
 
     asyncio.run(_run())

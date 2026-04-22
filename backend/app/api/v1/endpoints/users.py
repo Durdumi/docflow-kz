@@ -73,11 +73,16 @@ async def invite_user(
         role=data.role,
         is_active=True,
         is_verified=False,
+        telegram_chat_id=data.telegram_chat_id,
     )
     db.add(user)
     await db.flush()
     await db.refresh(user)
     await db.commit()
+
+    # TODO: send Telegram invite notification with temp_password
+    # when telegram_chat_id is available (Notifications stage)
+
     return UserRead.model_validate(user)
 
 

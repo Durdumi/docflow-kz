@@ -21,4 +21,10 @@ celery_app.conf.update(
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
+    beat_schedule={
+        "telegram-polling": {
+            "task": "notification_tasks.run_telegram_polling",
+            "schedule": 6.0,  # каждые 6 сек (задача polling timeout=5 + Redis lock)
+        },
+    },
 )

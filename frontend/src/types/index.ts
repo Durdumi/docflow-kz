@@ -13,6 +13,7 @@ export interface User {
   last_name: string;
   middle_name?: string;
   phone?: string;
+  telegram_chat_id?: string;
   role: UserRole;
   is_active: boolean;
   is_verified: boolean;

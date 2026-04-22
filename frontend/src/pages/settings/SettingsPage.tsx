@@ -42,6 +42,7 @@ export const SettingsPage = () => {
         last_name: user.last_name,
         middle_name: user.middle_name,
         phone: user.phone,
+        telegram_chat_id: user.telegram_chat_id,
       });
     }
   }, [user, profileForm]);
@@ -118,6 +119,25 @@ export const SettingsPage = () => {
           </Form.Item>
           <Form.Item name="phone" label="Телефон">
             <Input placeholder="+7 (777) 000-00-00" />
+          </Form.Item>
+          <Form.Item
+            name="telegram_chat_id"
+            label="Telegram ID для уведомлений"
+            extra={
+              <>
+                Напишите <b>/start</b> боту{" "}
+                <a
+                  href="https://t.me/DocFlowKZbot"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  @DocFlowKZbot
+                </a>{" "}
+                чтобы получить ваш ID
+              </>
+            }
+          >
+            <Input placeholder="123456789" prefix="✈️" />
           </Form.Item>
           <Divider />
           <Form.Item style={{ marginBottom: 0 }}>
