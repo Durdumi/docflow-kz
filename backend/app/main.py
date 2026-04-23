@@ -1,8 +1,11 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import settings
@@ -64,6 +67,20 @@ def create_application() -> FastAPI:
             "version": settings.APP_VERSION,
             "env": settings.APP_ENV,
         }
+
+    # ─── Frontend SPA (должно быть ПОСЛЕДНИМ — catch-all) ────────────────────
+    _dist = "/app/frontend_dist"
+    if os.path.exists(_dist):
+        _assets = f"{_dist}/assets"
+        if os.path.exists(_assets):
+            app.mount("/assets", StaticFiles(directory=_assets), name="assets")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_spa(full_path: str):
+            index = f"{_dist}/index.html"
+            if os.path.exists(index):
+                return FileResponse(index)
+            return {"error": "Frontend not built"}
 
     return app
 

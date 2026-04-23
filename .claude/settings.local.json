@@ -46,7 +46,15 @@
       "Bash(curl -s -H \"Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e\" \"http://127.0.0.1:27123/vault/DocFlow%20KZ/\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://127.0.0.1:27123/\" -H \"Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e\")",
       "Bash(curl -s http://127.0.0.1:27123/vault/DocFlow%20KZ/README.md -H 'Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e')",
-      "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:27123/vault/DocFlow%20KZ/%D0%92%D1%81%D1%82%D1%80%D0%B5%D1%87%D0%B8/2026-04-22.md -H 'Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e')"
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:27123/vault/DocFlow%20KZ/%D0%92%D1%81%D1%82%D1%80%D0%B5%D1%87%D0%B8/2026-04-22.md -H 'Authorization: Bearer c52eb0788ff684f84147d0d8ba6e14874847c9bd1c42c3515274354f52ae432e')",
+      "Read(//c/Users/iSpec/**)",
+      "Bash(find /d -maxdepth 6 -name \"2026-04-22.md\")",
+      "Bash(find \"/d\" -maxdepth 4 -type d -name \"DocFlow*\")",
+      "Bash(find \"/d\" -maxdepth 4 -type d -name \"Obsidian*\")",
+      "Read(//d/tmp/obsidian_vault/DocFlow_KZ//**)",
+      "Read(//d/Dumi/Dumi/DocFlow KZ//**)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('devDependencies',{}\\), indent=2\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/)"
     ]
   }
 }

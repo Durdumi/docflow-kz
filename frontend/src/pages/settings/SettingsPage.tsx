@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Button,
   Card,
@@ -9,18 +10,143 @@ import {
   Row,
   Select,
   Space,
+  Tag,
   Tabs,
+  Tooltip,
   Typography,
   message,
 } from "antd";
-import { BankOutlined, UserOutlined } from "@ant-design/icons";
+import { BankOutlined, BgColorsOutlined, UserOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { organizationsApi, usersApi } from "@/api/users";
 import { useAuthStore } from "@/store/authStore";
+import { useThemeStore, ACCENT_COLORS } from "@/store/themeStore";
 
 const { Title, Text } = Typography;
 
+function AppearanceSettings() {
+  const { isDark, accentColor, toggleDark, setAccentColor } = useThemeStore();
+
+  return (
+    <div>
+      {/* Тема */}
+      <div style={{ marginBottom: 32 }}>
+        <Title level={5} style={{ marginBottom: 16 }}>Тема оформления</Title>
+        <div style={{ display: "flex", gap: 16 }}>
+          {/* Светлая тема */}
+          <div
+            onClick={() => isDark && toggleDark()}
+            style={{
+              width: 140,
+              height: 100,
+              borderRadius: 12,
+              border: !isDark ? `2px solid ${accentColor}` : "2px solid #d9d9d9",
+              cursor: "pointer",
+              overflow: "hidden",
+              background: "#f5f7fa",
+              display: "flex",
+              flexDirection: "column",
+              padding: 8,
+              gap: 6,
+              transition: "all 0.2s",
+            }}
+          >
+            <div style={{ height: 16, background: "#fff", borderRadius: 4, width: "60%" }} />
+            <div style={{ height: 8, background: "#e8e8e8", borderRadius: 4 }} />
+            <div style={{ height: 8, background: "#e8e8e8", borderRadius: 4, width: "80%" }} />
+            <div style={{ marginTop: "auto", textAlign: "center" }}>
+              <Text style={{ fontSize: 11 }}>☀️ Светлая</Text>
+            </div>
+          </div>
+
+          {/* Тёмная тема */}
+          <div
+            onClick={() => !isDark && toggleDark()}
+            style={{
+              width: 140,
+              height: 100,
+              borderRadius: 12,
+              border: isDark ? `2px solid ${accentColor}` : "2px solid #d9d9d9",
+              cursor: "pointer",
+              overflow: "hidden",
+              background: "#1e1e1e",
+              display: "flex",
+              flexDirection: "column",
+              padding: 8,
+              gap: 6,
+              transition: "all 0.2s",
+            }}
+          >
+            <div style={{ height: 16, background: "#2d2d2d", borderRadius: 4, width: "60%" }} />
+            <div style={{ height: 8, background: "#333", borderRadius: 4 }} />
+            <div style={{ height: 8, background: "#333", borderRadius: 4, width: "80%" }} />
+            <div style={{ marginTop: "auto", textAlign: "center" }}>
+              <Text style={{ color: "#999", fontSize: 11 }}>🌙 Тёмная</Text>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Цвет акцента */}
+      <div>
+        <Title level={5} style={{ marginBottom: 16 }}>Цвет интерфейса</Title>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {ACCENT_COLORS.map((color) => (
+            <Tooltip key={color.value} title={color.name}>
+              <div
+                onClick={() => setAccentColor(color.value)}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background: color.value,
+                  border: accentColor === color.value
+                    ? "3px solid #fff"
+                    : "2px solid transparent",
+                  boxShadow: accentColor === color.value
+                    ? `0 0 0 2px ${color.value}, 0 4px 12px ${color.value}66`
+                    : "0 2px 6px rgba(0,0,0,0.15)",
+                  transition: "all 0.2s",
+                  transform: accentColor === color.value ? "scale(1.15)" : "scale(1)",
+                }} />
+                <Text style={{ fontSize: 11 }}>{color.name}</Text>
+              </div>
+            </Tooltip>
+          ))}
+        </div>
+      </div>
+
+      {/* Превью */}
+      <div style={{ marginTop: 32 }}>
+        <Title level={5} style={{ marginBottom: 16 }}>Превью</Title>
+        <Card
+          size="small"
+          style={{ maxWidth: 300 }}
+          title="Пример карточки"
+          extra={<Button type="primary" size="small">Кнопка</Button>}
+        >
+          <Text>Так будет выглядеть интерфейс с выбранными настройками.</Text>
+          <div style={{ marginTop: 8 }}>
+            <Tag color={accentColor}>Метка</Tag>
+            <Tag>Обычная</Tag>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 export const SettingsPage = () => {
+  const [searchParams] = useSearchParams();
+  const defaultTab = searchParams.get("tab") || "profile";
   const { user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
   const [profileForm] = Form.useForm();
@@ -152,6 +278,16 @@ export const SettingsPage = () => {
         </Form>
       ),
     },
+    {
+      key: "appearance",
+      label: (
+        <Space>
+          <BgColorsOutlined />
+          Внешний вид
+        </Space>
+      ),
+      children: <AppearanceSettings />,
+    },
     ...(isAdmin
       ? [
           {
@@ -251,7 +387,7 @@ export const SettingsPage = () => {
       </div>
 
       <Card bordered={false} style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-        <Tabs items={tabItems} />
+        <Tabs items={tabItems} defaultActiveKey={defaultTab} />
       </Card>
     </div>
   );

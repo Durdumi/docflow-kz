@@ -3,16 +3,19 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Avatar,
   Badge,
-  Breadcrumb,
   Dropdown,
   Layout,
   Menu,
+  Popover,
   Space,
+  Switch,
+  Tooltip,
   Typography,
   theme,
 } from "antd";
 import {
   BellOutlined,
+  BgColorsOutlined,
   CalendarOutlined,
   CheckSquareOutlined,
   DashboardOutlined,
@@ -23,12 +26,15 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  MoonOutlined,
   SettingOutlined,
+  SunOutlined,
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
+import { useThemeStore, ACCENT_COLORS } from "@/store/themeStore";
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -52,6 +58,7 @@ export const AppLayout = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const { token: colorToken } = theme.useToken();
+  const { isDark, accentColor, toggleDark, setAccentColor } = useThemeStore();
 
   const isAdmin = user?.role === "org_admin" || user?.role === "super_admin";
 
@@ -68,7 +75,13 @@ export const AppLayout = () => {
       key: "profile",
       icon: <UserOutlined />,
       label: t("nav.settings"),
-      onClick: () => navigate("/settings/profile"),
+      onClick: () => navigate("/settings"),
+    },
+    {
+      key: "appearance",
+      icon: <BgColorsOutlined />,
+      label: "Внешний вид",
+      onClick: () => navigate("/settings?tab=appearance"),
     },
     {
       key: "lang-ru",
@@ -91,6 +104,37 @@ export const AppLayout = () => {
       onClick: logout,
     },
   ];
+
+  const colorPickerContent = (
+    <div style={{ padding: 8 }}>
+      <div style={{ fontSize: 12, color: "#999", marginBottom: 8 }}>
+        Цвет интерфейса
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxWidth: 200 }}>
+        {ACCENT_COLORS.map((color) => (
+          <Tooltip key={color.value} title={color.name}>
+            <div
+              onClick={() => setAccentColor(color.value)}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: color.value,
+                cursor: "pointer",
+                border: accentColor === color.value
+                  ? "3px solid #fff"
+                  : "2px solid transparent",
+                boxShadow: accentColor === color.value
+                  ? `0 0 0 2px ${color.value}`
+                  : "none",
+                transition: "all 0.2s",
+              }}
+            />
+          </Tooltip>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -168,6 +212,30 @@ export const AppLayout = () => {
 
           {/* Right side */}
           <Space size={16}>
+            {/* Color picker */}
+            <Popover
+              trigger="click"
+              placement="bottomRight"
+              content={colorPickerContent}
+            >
+              <Tooltip title="Цвет интерфейса">
+                <BgColorsOutlined
+                  style={{ fontSize: 18, cursor: "pointer", color: accentColor }}
+                />
+              </Tooltip>
+            </Popover>
+
+            {/* Dark mode toggle */}
+            <Tooltip title={isDark ? "Светлая тема" : "Тёмная тема"}>
+              <Switch
+                checked={isDark}
+                onChange={toggleDark}
+                checkedChildren={<MoonOutlined />}
+                unCheckedChildren={<SunOutlined />}
+                size="small"
+              />
+            </Tooltip>
+
             {/* Notifications */}
             <Badge count={3} size="small">
               <BellOutlined style={{ fontSize: 18, cursor: "pointer" }} />
