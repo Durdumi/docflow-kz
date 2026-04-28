@@ -2,7 +2,8 @@ import json
 import uuid
 from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select, text, desc
+from sqlalchemy import cast, or_, select, text, desc
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.deps import get_db
 from app.core.config import settings
@@ -11,6 +12,7 @@ from app.models.tasks import Task
 from app.models.documents import Document, DocumentStatus
 from app.models.reports import Report, ReportStatus, ReportType, ReportFormat
 from app.models.imports import DataImport
+from app.services.telegram_state import get_state, set_state, update_data, get_data, clear_state
 
 router = APIRouter(prefix="/telegram", tags=["Telegram"])
 
@@ -37,6 +39,33 @@ async def answer_cb(callback_id: str, text: str = ""):
             json={"callback_query_id": callback_id, "text": text},
             timeout=10,
         )
+
+
+async def edit_tg_reply_markup(chat_id: str, message_id: int, keyboard: dict):
+    import httpx
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/editMessageReplyMarkup",
+            json={"chat_id": chat_id, "message_id": message_id, "reply_markup": json.dumps(keyboard)},
+            timeout=10,
+        )
+
+
+def _build_assignees_keyboard(users_data: list[dict], selected_ids: list[str]) -> dict:
+    buttons = []
+    for u in users_data:
+        prefix = "✅ " if u["id"] in selected_ids else ""
+        buttons.append([{
+            "text": f"{prefix}{u['name']}",
+            "callback_data": f"task_create_toggle_{u['id']}",
+        }])
+    n = len(selected_ids)
+    if n > 0:
+        buttons.append([{"text": f"✔ Подтвердить ({n} выбр.)", "callback_data": "task_create_confirm_assignees"}])
+    else:
+        buttons.append([{"text": "⏭ Пропустить", "callback_data": "task_create_skip_assignee"}])
+    buttons.append([{"text": "✖ Отмена", "callback_data": "task_create_cancel"}])
+    return {"inline_keyboard": buttons}
 
 
 async def get_user(chat_id: str, db: AsyncSession) -> User | None:
@@ -104,9 +133,12 @@ async def handle_tasks_my(chat_id: str, user: User, db: AsyncSession):
 
     result = await db.execute(
         select(Task).where(
-            Task.assignee_id == user.id,
             Task.organization_id == user.organization_id,
             Task.status.notin_(["done"]),
+            or_(
+                Task.assignee_id == user.id,
+                Task.assignee_ids.op("@>")(cast([str(user.id)], JSONB)),
+            ),
         ).order_by(Task.created_at.desc()).limit(10)
     )
     tasks = result.scalars().all()
@@ -193,6 +225,7 @@ async def handle_task_view(chat_id: str, task_id: str, user: User, db: AsyncSess
     for i in range(0, len(status_buttons), 2):
         buttons.append(status_buttons[i:i+2])
 
+    buttons.append([{"text": "👥 Управление ответственными", "callback_data": f"task_manage_assignees_{task.id}"}])
     buttons.append([{"text": "« К задачам", "callback_data": "tasks_my"}])
     buttons.append([{"text": "🏠 Меню", "callback_data": "main_menu"}])
 
@@ -649,6 +682,304 @@ async def handle_profile(chat_id: str, user: User, db: AsyncSession):
     })
 
 
+# ─── MANAGE ASSIGNEES ─────────────────────────────────────────
+async def handle_manage_assignees(chat_id: str, task_id: str, user: User, db: AsyncSession, callback_id: str):
+    org = await get_org(user, db)
+    if not org:
+        return
+    await set_tenant_schema(org, db)
+
+    try:
+        uid = uuid.UUID(task_id)
+    except ValueError:
+        return
+
+    result = await db.execute(select(Task).where(Task.id == uid))
+    task = result.scalar_one_or_none()
+    if not task:
+        await send_tg(chat_id, "❌ Задача не найдена")
+        return
+
+    await db.execute(text("SET search_path TO public"))
+    users_result = await db.execute(
+        select(User).where(
+            User.organization_id == user.organization_id,
+            User.is_active == True,
+        ).limit(15)
+    )
+    org_users = users_result.scalars().all()
+
+    current_ids = [str(x) for x in (task.assignee_ids or [])]
+
+    buttons = []
+    assignee_names = []
+    for u in org_users:
+        is_assigned = str(u.id) in current_ids
+        if is_assigned:
+            assignee_names.append(f"{u.last_name} {u.first_name}")
+        action = "remove" if is_assigned else "add"
+        prefix = "✅ " if is_assigned else "➕ "
+        buttons.append([{
+            "text": f"{prefix}{u.last_name} {u.first_name}",
+            "callback_data": f"task_assignee_{action}_{task.id}_{u.id}",
+        }])
+
+    buttons.append([{"text": "« Назад к задаче", "callback_data": f"task_view_{task.id}"}])
+
+    current_text = "\n".join(f"• {n}" for n in assignee_names) if assignee_names else "никто"
+    await send_tg(
+        chat_id,
+        f"👥 <b>Ответственные:</b>\n📌 {task.title}\n\n"
+        f"Текущие:\n{current_text}\n\n"
+        f"Нажмите чтобы добавить / убрать:",
+        {"inline_keyboard": buttons},
+    )
+
+
+async def handle_toggle_assignee(
+    chat_id: str, action: str, task_id: str, target_user_id: str,
+    user: User, db: AsyncSession, callback_id: str,
+):
+    org = await get_org(user, db)
+    if not org:
+        return
+    await set_tenant_schema(org, db)
+
+    try:
+        task_uid = uuid.UUID(task_id)
+        target_uid = uuid.UUID(target_user_id)
+    except ValueError:
+        await answer_cb(callback_id, "❌ Ошибка")
+        return
+
+    result = await db.execute(select(Task).where(Task.id == task_uid))
+    task = result.scalar_one_or_none()
+    if not task:
+        await answer_cb(callback_id, "❌ Задача не найдена")
+        return
+
+    current_ids = [str(x) for x in (task.assignee_ids or [])]
+
+    if action == "add" and str(target_uid) not in current_ids:
+        current_ids.append(str(target_uid))
+        await db.execute(text("SET search_path TO public"))
+        r = await db.execute(select(User).where(User.id == target_uid))
+        target_user = r.scalar_one_or_none()
+        if target_user and target_user.telegram_chat_id and target_user.id != user.id:
+            from app.services.telegram_service import send_message
+            await send_message(
+                target_user.telegram_chat_id,
+                f"👤 Вас добавили как ответственного!\n\n"
+                f"📌 {task.title}\n"
+                f"Добавил: {user.last_name} {user.first_name}",
+            )
+        await db.execute(text(f'SET search_path TO "{org.schema_name}", public'))
+    elif action == "remove" and str(target_uid) in current_ids:
+        current_ids.remove(str(target_uid))
+
+    task.assignee_ids = current_ids
+    task.assignee_id = uuid.UUID(current_ids[0]) if current_ids else None
+    await db.commit()
+    await answer_cb(callback_id, "✅ Обновлено")
+
+    await handle_manage_assignees(chat_id, task_id, user, db, callback_id)
+
+
+# ─── TASK CREATE DIALOG ───────────────────────────────────────
+async def handle_task_create_start(chat_id: str, user: User):
+    set_state(chat_id, "waiting_title")
+    await send_tg(
+        chat_id,
+        "➕ <b>Создание задачи — Шаг 1 из 4</b>\n\n"
+        "Введите <b>название задачи</b>:",
+        {"inline_keyboard": [[{"text": "✖ Отмена", "callback_data": "task_create_cancel"}]]},
+    )
+
+
+async def handle_task_create_dialog(chat_id: str, text_input: str, user: User, db: AsyncSession):
+    state = get_state(chat_id)
+
+    if state == "waiting_title":
+        title = text_input.strip()
+        if len(title) < 2:
+            await send_tg(chat_id, "❌ Название слишком короткое. Введите ещё раз:")
+            return
+        update_data(chat_id, title=title)
+        await ask_task_priority(chat_id, user)
+
+    elif state == "waiting_due_date":
+        raw = text_input.strip().lower()
+        if raw in ("нет", "skip", "-", "пропустить"):
+            update_data(chat_id, due_date=None)
+        else:
+            from datetime import datetime
+            parsed = None
+            for fmt in ("%d.%m.%Y", "%d.%m.%y", "%d/%m/%Y", "%Y-%m-%d"):
+                try:
+                    parsed = datetime.strptime(raw, fmt)
+                    break
+                except ValueError:
+                    continue
+            if not parsed:
+                await send_tg(
+                    chat_id,
+                    "❌ Не удалось распознать дату. Введите в формате <b>дд.мм.гггг</b> или нажмите «Пропустить»:",
+                    {"inline_keyboard": [
+                        [{"text": "⏭ Пропустить", "callback_data": "task_create_skip_due"}],
+                        [{"text": "✖ Отмена", "callback_data": "task_create_cancel"}],
+                    ]},
+                )
+                return
+            update_data(chat_id, due_date=parsed.isoformat())
+        await ask_task_assignees(chat_id, user, db)
+
+    else:
+        await send_tg(
+            chat_id,
+            "🏠 Используйте кнопки меню.",
+            {"inline_keyboard": [[{"text": "🏠 Меню", "callback_data": "main_menu"}]]},
+        )
+
+
+async def ask_task_priority(chat_id: str, user: User):
+    set_state(chat_id, "waiting_priority")
+    await send_tg(
+        chat_id,
+        "➕ <b>Создание задачи — Шаг 2 из 4</b>\n\nВыберите <b>приоритет</b>:",
+        {"inline_keyboard": [
+            [
+                {"text": "↓ Низкий", "callback_data": "task_create_priority_low"},
+                {"text": "→ Средний", "callback_data": "task_create_priority_medium"},
+            ],
+            [
+                {"text": "↑ Высокий", "callback_data": "task_create_priority_high"},
+                {"text": "🔥 Срочно", "callback_data": "task_create_priority_urgent"},
+            ],
+            [{"text": "✖ Отмена", "callback_data": "task_create_cancel"}],
+        ]},
+    )
+
+
+async def ask_task_due_date(chat_id: str, user: User):
+    set_state(chat_id, "waiting_due_date")
+    await send_tg(
+        chat_id,
+        "➕ <b>Создание задачи — Шаг 3 из 4</b>\n\n"
+        "Введите <b>дедлайн</b> в формате дд.мм.гггг\nили нажмите «Пропустить»:",
+        {"inline_keyboard": [
+            [{"text": "⏭ Пропустить", "callback_data": "task_create_skip_due"}],
+            [{"text": "✖ Отмена", "callback_data": "task_create_cancel"}],
+        ]},
+    )
+
+
+async def ask_task_assignees(chat_id: str, user: User, db: AsyncSession):
+    set_state(chat_id, "waiting_assignees")
+    update_data(chat_id, selected_assignees=[])
+
+    result = await db.execute(
+        select(User).where(
+            User.organization_id == user.organization_id,
+            User.is_active == True,
+        ).limit(10)
+    )
+    users = result.scalars().all()
+
+    users_data = []
+    for u in users:
+        name = f"{u.last_name} {u.first_name}"
+        if u.id == user.id:
+            name += " (я)"
+        users_data.append({"id": str(u.id), "name": name})
+    update_data(chat_id, assignees_list=users_data)
+
+    keyboard = _build_assignees_keyboard(users_data, [])
+    resp = await send_tg(
+        chat_id,
+        "➕ <b>Создание задачи — Шаг 4 из 4</b>\n\nВыберите <b>исполнителей</b> (можно несколько):",
+        keyboard,
+    )
+    try:
+        msg_id = resp.json()["result"]["message_id"]
+        update_data(chat_id, assignees_msg_id=msg_id)
+    except Exception:
+        pass
+
+
+async def finalize_task_create(chat_id: str, user: User, db: AsyncSession):
+    data = get_data(chat_id)
+    clear_state(chat_id)
+
+    org = await get_org(user, db)
+    if not org:
+        await send_tg(chat_id, "❌ Организация не найдена")
+        return
+    await set_tenant_schema(org, db)
+
+    from datetime import datetime
+    from app.models.boards import Board as BoardModel
+
+    due_date = None
+    if data.get("due_date"):
+        try:
+            due_date = datetime.fromisoformat(data["due_date"])
+        except Exception:
+            pass
+
+    board_result = await db.execute(
+        select(BoardModel).where(
+            BoardModel.organization_id == user.organization_id,
+            BoardModel.is_archived == False,
+        ).order_by(BoardModel.created_at).limit(1)
+    )
+    default_board = board_result.scalar_one_or_none()
+
+    selected: list[str] = data.get("selected_assignees") or []
+    first_assignee_id = uuid.UUID(selected[0]) if selected else None
+
+    task = Task(
+        title=data.get("title", "Без названия"),
+        priority=data.get("priority", "medium"),
+        due_date=due_date,
+        assignee_id=first_assignee_id,
+        assignee_ids=selected,
+        board_id=default_board.id if default_board else None,
+        created_by_id=user.id,
+        organization_id=user.organization_id,
+        status="todo",
+        checklist=[],
+        attachments=[],
+        comments=[],
+        label_ids=[],
+        watch_user_ids=[],
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    PRIORITY_EMOJI = {"low": "↓", "medium": "→", "high": "↑", "urgent": "🔥"}
+    due_text = f"\n📅 Дедлайн: {task.due_date.strftime('%d.%m.%Y')}" if task.due_date else ""
+    p_emoji = PRIORITY_EMOJI.get(str(task.priority), "→")
+
+    users_data: list[dict] = data.get("assignees_list") or []
+    name_map = {u["id"]: u["name"] for u in users_data}
+    assignees_text = ""
+    if selected:
+        names = [name_map.get(uid, uid) for uid in selected]
+        assignees_text = f"\n👤 Исполнители: {', '.join(names)}"
+
+    await send_tg(
+        chat_id,
+        f"✅ <b>Задача создана!</b>\n\n"
+        f"📌 <b>{task.title}</b>\n"
+        f"{p_emoji} Приоритет: {task.priority}{due_text}{assignees_text}",
+        {"inline_keyboard": [
+            [{"text": "📋 Мои задачи", "callback_data": "tasks_my"}],
+            [{"text": "🏠 Главное меню", "callback_data": "main_menu"}],
+        ]},
+    )
+
+
 # ─── WEBHOOK HANDLER ──────────────────────────────────────────
 @router.post("/webhook")
 async def telegram_webhook(
@@ -697,12 +1028,51 @@ async def telegram_webhook(
         elif cb_data == "tasks_start_list":
             await handle_tasks_my(chat_id, user, db)
         elif cb_data == "tasks_create":
-            await send_tg(chat_id,
-                "➕ Для создания задачи используйте веб-интерфейс:\n"
-                "http://localhost:3000/tasks\n\n"
-                "В следующей версии создание задач будет доступно прямо в боте.",
-                {"inline_keyboard": [[{"text": "« Назад", "callback_data": "menu_tasks"}]]}
-            )
+            await handle_task_create_start(chat_id, user)
+
+        # Task create dialog callbacks
+        elif cb_data.startswith("task_create_priority_"):
+            priority = cb_data.replace("task_create_priority_", "")
+            update_data(chat_id, priority=priority)
+            await ask_task_due_date(chat_id, user)
+        elif cb_data == "task_create_skip_due":
+            update_data(chat_id, due_date=None)
+            await ask_task_assignees(chat_id, user, db)
+        elif cb_data.startswith("task_create_toggle_"):
+            uid_str = cb_data.replace("task_create_toggle_", "")
+            d = get_data(chat_id)
+            selected: list[str] = list(d.get("selected_assignees") or [])
+            if uid_str in selected:
+                selected.remove(uid_str)
+            else:
+                selected.append(uid_str)
+            update_data(chat_id, selected_assignees=selected)
+            users_data = d.get("assignees_list") or []
+            msg_id = d.get("assignees_msg_id")
+            if msg_id:
+                await edit_tg_reply_markup(chat_id, msg_id, _build_assignees_keyboard(users_data, selected))
+        elif cb_data == "task_create_confirm_assignees":
+            await finalize_task_create(chat_id, user, db)
+        elif cb_data == "task_create_skip_assignee":
+            update_data(chat_id, selected_assignees=[])
+            await finalize_task_create(chat_id, user, db)
+        elif cb_data == "task_create_cancel":
+            clear_state(chat_id)
+            await handle_tasks_menu(chat_id, user, db)
+
+        # Manage assignees
+        elif cb_data.startswith("task_manage_assignees_"):
+            task_id = cb_data.replace("task_manage_assignees_", "")
+            await handle_manage_assignees(chat_id, task_id, user, db, cb_id)
+        elif cb_data.startswith("task_assignee_"):
+            # task_assignee_{add|remove}_{task_uuid}_{user_uuid}
+            without = cb_data.replace("task_assignee_", "")
+            parts = without.split("_", 1)
+            if len(parts) == 2:
+                action = parts[0]
+                rest = parts[1]
+                if len(rest) >= 73:  # 36 + "_" + 36
+                    await handle_toggle_assignee(chat_id, action, rest[:36], rest[37:], user, db, cb_id)
 
         # Documents
         elif cb_data == "menu_docs":
@@ -805,6 +1175,12 @@ async def telegram_webhook(
             f"Ваш Chat ID: <code>{chat_id}</code>\n"
             f"Вставьте его в Настройки → Профиль → Telegram Chat ID"
         )
+        return {"ok": True}
+
+    # Диалог создания задачи — перехват до команд
+    active_state = get_state(chat_id)
+    if active_state in ("waiting_title", "waiting_due_date"):
+        await handle_task_create_dialog(chat_id, text_msg, user, db)
         return {"ok": True}
 
     # Команды

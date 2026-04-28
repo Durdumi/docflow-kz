@@ -44,6 +44,16 @@ class Task(TenantBase):
     position: Mapped[int] = mapped_column(Integer, default=0)
     label_color: Mapped[str | None] = mapped_column(String(20))
 
+    # Board & rich fields (added in 0009)
+    board_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    assignee_ids: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    checklist: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    attachments: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    comments: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    cover_color: Mapped[str | None] = mapped_column(String(20))
+    label_ids: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    watch_user_ids: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

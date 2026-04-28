@@ -105,11 +105,12 @@ async def list_tasks(
     current_user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
     status_filter: str | None = None,
+    board_id: uuid.UUID | None = None,
 ):
     schema = await _get_schema(current_user, db)
     await db.execute(text(f'SET search_path TO "{schema}", public'))
     service = TaskService(db)
-    return await service.get_tasks(current_user.organization_id, status_filter)
+    return await service.get_tasks(current_user.organization_id, status_filter, board_id)
 
 
 @router.get("/{task_id}/activity")

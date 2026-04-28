@@ -1,10 +1,11 @@
 import { apiClient } from "./client";
 
 export const tasksApi = {
-  list: async (status?: string) => {
-    const response = await apiClient.get("/tasks", {
-      params: status ? { status_filter: status } : {},
-    });
+  list: async (status?: string, boardId?: string) => {
+    const params: Record<string, string> = {};
+    if (status) params.status_filter = status;
+    if (boardId) params.board_id = boardId;
+    const response = await apiClient.get("/tasks", { params });
     return response.data;
   },
   create: async (data: any) => {

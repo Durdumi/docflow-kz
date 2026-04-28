@@ -29,11 +29,13 @@ class TaskService:
         return TaskRead.model_validate(task)
 
     async def get_tasks(
-        self, org_id: uuid.UUID, status: str | None = None
+        self, org_id: uuid.UUID, status: str | None = None, board_id: uuid.UUID | None = None
     ) -> list[TaskRead]:
         query = select(Task).where(Task.organization_id == org_id)
         if status:
             query = query.where(Task.status == status)
+        if board_id:
+            query = query.where(Task.board_id == board_id)
         query = query.order_by(Task.position, Task.created_at)
         result = await self.db.execute(query)
         tasks = result.scalars().all()

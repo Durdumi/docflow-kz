@@ -15,6 +15,11 @@ class TaskCreate(BaseModel):
     related_report_id: uuid.UUID | None = None
     position: int = 0
     label_color: str | None = None
+    board_id: uuid.UUID | None = None
+    assignee_ids: list[uuid.UUID] = Field(default_factory=list)
+    checklist: list[dict] = Field(default_factory=list)
+    cover_color: str | None = None
+    label_ids: list[str] = Field(default_factory=list)
 
 
 class TaskUpdate(BaseModel):
@@ -26,6 +31,14 @@ class TaskUpdate(BaseModel):
     assignee_id: uuid.UUID | None = None
     position: int | None = None
     label_color: str | None = None
+    board_id: uuid.UUID | None = None
+    assignee_ids: list[uuid.UUID] | None = None
+    checklist: list[dict] | None = None
+    attachments: list[dict] | None = None
+    comments: list[dict] | None = None
+    cover_color: str | None = None
+    label_ids: list[str] | None = None
+    watch_user_ids: list[str] | None = None
 
 
 class TaskRead(BaseModel):
@@ -47,6 +60,14 @@ class TaskRead(BaseModel):
     label_color: str | None
     created_at: datetime
     updated_at: datetime
+    board_id: uuid.UUID | None = None
+    assignee_ids: list = Field(default_factory=list)
+    checklist: list = Field(default_factory=list)
+    attachments: list = Field(default_factory=list)
+    comments: list = Field(default_factory=list)
+    cover_color: str | None = None
+    label_ids: list = Field(default_factory=list)
+    watch_user_ids: list = Field(default_factory=list)
 
 
 class CalendarEventCreate(BaseModel):
